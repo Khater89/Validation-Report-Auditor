@@ -3,121 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Validation Report Auditor</title>
+  <title>Validation Report Auditor v4</title>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-  <style>
-    :root {
-      --blue: #2f80ed;
-      --blue-soft: #eaf3ff;
-      --orange: #f2994a;
-      --orange-soft: #fff2e5;
-      --green: #dff6e4;
-      --red: #fde7e7;
-      --yellow: #fff4cc;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --line: #e5e7eb;
-      --bg: #f8fafc;
-      --white: #ffffff;
-      --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Inter, Segoe UI, Arial, sans-serif;
-      background: linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
-      color: var(--text);
-    }
-    .container { max-width: 1600px; margin: 0 auto; padding: 24px; }
-    .hero {
-      display: flex; justify-content: space-between; gap: 16px; align-items: center;
-      margin-bottom: 20px; padding: 20px 24px; background: var(--white);
-      border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow);
-    }
-    h1 { margin: 0 0 8px; font-size: 28px; }
-    .muted { color: var(--muted); }
-    .dropzone {
-      border: 2px dashed #cbd5e1; border-radius: 20px;
-      background: linear-gradient(135deg, var(--blue-soft), var(--orange-soft));
-      padding: 28px; text-align: center; cursor: pointer; transition: .2s ease; margin-bottom: 20px;
-    }
-    .dropzone.drag { border-color: var(--blue); transform: translateY(-1px); }
-    .dropzone input { display: none; }
-    .cards {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 14px; margin-bottom: 20px;
-    }
-    .card {
-      background: var(--white); border: 1px solid var(--line); border-radius: 18px;
-      padding: 16px; box-shadow: var(--shadow);
-    }
-    .card .label { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
-    .card .value { font-size: 26px; font-weight: 700; }
-    .card.success { border-left: 6px solid #22c55e; }
-    .card.error { border-left: 6px solid #ef4444; }
-    .card.warn { border-left: 6px solid #f59e0b; }
-    .toolbar {
-      display: grid; grid-template-columns: 1.2fr 1fr 1fr auto auto;
-      gap: 12px; align-items: center; margin-bottom: 16px;
-    }
-    .panel {
-      background: var(--white); border: 1px solid var(--line); border-radius: 20px;
-      padding: 16px; box-shadow: var(--shadow); margin-bottom: 18px;
-    }
-    input[type="text"], select {
-      width: 100%; padding: 12px 14px; border: 1px solid #d1d5db;
-      border-radius: 14px; outline: none; font-size: 14px; background: #fff;
-    }
-    button {
-      border: 0; background: #111827; color: #fff; padding: 12px 16px;
-      border-radius: 14px; cursor: pointer; font-weight: 600;
-    }
-    button.secondary { background: var(--blue); }
-    button.orange { background: var(--orange); }
-    table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
-    thead tr.group th {
-      color: #fff; text-align: center; padding: 10px; position: sticky; top: 0; z-index: 3;
-    }
-    thead tr.cols th {
-      position: sticky; top: 40px; z-index: 2; background: #111827; color: white;
-      padding: 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap;
-    }
-    .g-core { background: #111827; }
-    .g-ie { background: var(--blue); }
-    .g-fn { background: var(--orange); }
-    .g-val { background: #0f766e; }
-    tbody td {
-      padding: 10px; border-bottom: 1px solid #eef2f7; vertical-align: top; white-space: nowrap;
-    }
-    tbody tr.matched { background: #f7fcf8; }
-    tbody tr.error { background: #fff8f8; }
-    tbody tr.exception { background: #fffdf4; }
-    .pill {
-      display: inline-block; padding: 4px 10px; border-radius: 999px;
-      font-size: 12px; font-weight: 700;
-    }
-    .pill.ok { background: var(--green); color: #166534; }
-    .pill.err { background: var(--red); color: #991b1b; }
-    .pill.warn { background: var(--yellow); color: #92400e; }
-    .hidden { display: none; }
-    .table-wrap { overflow: auto; max-height: 70vh; border-radius: 16px; border: 1px solid var(--line); }
-    .footnote { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
-    @media (max-width: 1100px) { .toolbar { grid-template-columns: 1fr 1fr; } }
-  </style>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="container">
     <div class="hero">
       <div>
         <h1>Validation Report Auditor</h1>
-        <div class="muted">Upload an Excel workbook, validate IE vs Field Nation, filter issues, and export the error report.</div>
+        <div class="muted">Upload the Excel workbook, review IE vs Field Nation, mark handled errors as Corrected, and export the final report with statistics.</div>
       </div>
-      <div class="muted">Orange = Field Nation · Blue = IE</div>
+      <div class="hero-badges">
+        <span class="badge ie">Blue = IE</span>
+        <span class="badge fn">Orange = Field Nation</span>
+      </div>
     </div>
 
     <label class="dropzone" id="dropzone">
       <input type="file" id="fileInput" accept=".xlsx,.xls" />
-      <div style="font-size:18px;font-weight:700;margin-bottom:8px;">Drag & drop your Excel file here</div>
+      <div class="drop-title">Drag & drop your Excel file here</div>
       <div class="muted">Or click to browse. Best with a workbook that contains the <strong>Report</strong> sheet.</div>
     </label>
 
@@ -128,7 +33,8 @@
         <input type="text" id="searchInput" placeholder="Search ticket number or technician name" />
         <select id="resultFilter">
           <option value="all">All results</option>
-          <option value="error">Errors only</option>
+          <option value="error">Open errors only</option>
+          <option value="corrected">Corrected only</option>
           <option value="matched">Matched only</option>
           <option value="exception">Matched by exception</option>
         </select>
@@ -136,12 +42,22 @@
           <option value="all">All ticket types</option>
         </select>
         <button id="applyBtn">Apply Filters</button>
-        <button id="exportBtn" class="secondary">Export Errors CSV</button>
+        <button id="exportWorkbookBtn" class="secondary">Export Final XLSX</button>
+        <button id="exportEmailBtn" class="orange">Export Outlook Email (.eml)</button>
       </div>
+
+      <div class="email-toolbar">
+        <input type="text" id="emailTo" placeholder="Outlook To (optional)" />
+        <input type="text" id="emailCc" placeholder="Outlook CC (optional)" />
+        <input type="text" id="emailSubject" placeholder="Email subject" />
+      </div>
+
       <div class="footnote">
-        Validation rules: IE &amp; FN Status must be OK, IE Due Date must match FN Scheduled Date, IE Due Time must match FN Scheduled Time, and IE FE Name must match FN FE Name.
+        Validation rules: IE &amp; FN Status must be <strong>OK</strong>, IE Due Date must match FN Scheduled Date, IE Due Time must match FN Scheduled Time, and IE FE Name must match FN FE Name.
         <br />
         Exception rules: <strong>date mismatches</strong> are accepted only when Ticket Type = <strong>ITD</strong>. <strong>time mismatches</strong> are accepted when Ticket Type = <strong>ITD or ITR</strong>.
+        <br />
+        Action rule: for any row with an open error, click <strong>Correct</strong> after fixing the source externally. The button turns to <strong>Corrected</strong> and the row is tracked as completed for statistics and export. No pop-up is used.
       </div>
     </div>
 
@@ -150,12 +66,13 @@
         <table>
           <thead>
             <tr class="group">
-              <th class="g-core" colspan="3">Core</th>
+              <th class="g-core" colspan="4">Core</th>
               <th class="g-ie" colspan="5">Inside Edge</th>
               <th class="g-fn" colspan="4">Field Nation</th>
-              <th class="g-val" colspan="7">Validation</th>
+              <th class="g-val" colspan="9">Validation & Tracking</th>
             </tr>
             <tr class="cols">
+              <th>Excel Row</th>
               <th>Ticket</th>
               <th>Type</th>
               <th>Assigned Company</th>
@@ -174,7 +91,9 @@
               <th>Name</th>
               <th>Exception</th>
               <th>Final Result</th>
-              <th>Issues</th>
+              <th>Details</th>
+              <th>Tracking Note</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody id="resultsBody"></tbody>
@@ -183,288 +102,6 @@
     </div>
   </div>
 
-  <script>
-    const state = { raw: [], filtered: [] };
-
-    const el = id => document.getElementById(id);
-    const dropzone = el('dropzone');
-    const fileInput = el('fileInput');
-    const cards = el('cards');
-    const toolbarPanel = el('toolbarPanel');
-    const tablePanel = el('tablePanel');
-    const resultsBody = el('resultsBody');
-    const searchInput = el('searchInput');
-    const resultFilter = el('resultFilter');
-    const ticketTypeFilter = el('ticketTypeFilter');
-
-    const normalize = v => (v ?? '').toString().trim().replace(/\s+/g, ' ');
-    const normalizeName = v => normalize(v).toUpperCase();
-
-    function excelDateToJS(v) {
-      if (v === undefined || v === null || v === '') return null;
-      if (v instanceof Date) return v;
-      if (typeof v === 'number') {
-        const utc = Math.round((v - 25569) * 86400 * 1000);
-        return new Date(utc);
-      }
-      const d = new Date(v);
-      return Number.isNaN(d.getTime()) ? null : d;
-    }
-
-    function parseDatePart(v) {
-      const d = excelDateToJS(v);
-      if (!d) return '';
-      return d.toISOString().slice(0, 10);
-    }
-
-    function parseTimePart(v) {
-      if (v === undefined || v === null || v === '') return '';
-      if (typeof v === 'string') {
-        const match = v.match(/(\d{1,2}:\d{2})/);
-        return match ? match[1].padStart(5, '0') : v;
-      }
-      if (typeof v === 'number') {
-        const seconds = Math.round(v * 24 * 60 * 60);
-        const h = String(Math.floor(seconds / 3600) % 24).padStart(2, '0');
-        const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-        return `${h}:${m}`;
-      }
-      const d = excelDateToJS(v);
-      if (!d) return '';
-      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    }
-
-    function pill(ok, textOk = 'OK', textErr = 'Error') {
-      return ok
-        ? `<span class="pill ok">${textOk}</span>`
-        : `<span class="pill err">${textErr}</span>`;
-    }
-
-    function buildCards(rows) {
-      const total = rows.length;
-      const matched = rows.filter(r => r.finalResult === 'Matched').length;
-      const errors = rows.filter(r => r.finalResult === 'Error').length;
-      const exceptions = rows.filter(r => r.exceptionApplied).length;
-      const progress = total ? ((matched / total) * 100).toFixed(1) : '0.0';
-      const timeErrors = rows.filter(r => !r.timeValid).length;
-      const nameErrors = rows.filter(r => !r.nameValid).length;
-      const statusErrors = rows.filter(r => !r.statusOk).length;
-
-      cards.innerHTML = `
-        <div class="card"><div class="label">Comparable Tickets</div><div class="value">${total}</div></div>
-        <div class="card success"><div class="label">Matched</div><div class="value">${matched}</div></div>
-        <div class="card error"><div class="label">Errors</div><div class="value">${errors}</div></div>
-        <div class="card warn"><div class="label">Exceptions Applied</div><div class="value">${exceptions}</div></div>
-        <div class="card"><div class="label">Completion</div><div class="value">${progress}%</div></div>
-        <div class="card"><div class="label">Effective Time Errors</div><div class="value">${timeErrors}</div></div>
-        <div class="card"><div class="label">Status Errors</div><div class="value">${statusErrors}</div></div>
-        <div class="card"><div class="label">Name Errors</div><div class="value">${nameErrors}</div></div>
-      `;
-      cards.classList.remove('hidden');
-    }
-
-    function populateTicketTypes(rows) {
-      const types = [...new Set(rows.map(r => r.ticketType).filter(Boolean))].sort();
-      ticketTypeFilter.innerHTML = '<option value="all">All ticket types</option>' +
-        types.map(t => `<option value="${t}">${t}</option>`).join('');
-    }
-
-    function renderTable(rows) {
-      resultsBody.innerHTML = rows.map(r => {
-        const rowClass = r.finalResult === 'Error' ? 'error' : (r.exceptionApplied ? 'exception' : 'matched');
-        const finalPill = r.finalResult === 'Error'
-          ? '<span class="pill err">Error</span>'
-          : (r.exceptionApplied ? '<span class="pill warn">Matched via exception</span>' : '<span class="pill ok">Matched</span>');
-
-        return `
-          <tr class="${rowClass}">
-            <td>${r.ticket}</td>
-            <td>${r.ticketType || ''}</td>
-            <td>${r.assignedCompany || ''}</td>
-            <td>${r.ieFnStatus || ''}</td>
-            <td>${r.ieFeName || ''}</td>
-            <td>${r.ieDueDate || ''}</td>
-            <td>${r.ieDueTime || ''}</td>
-            <td>${[r.ieScheduledDate, r.ieScheduledTime].filter(Boolean).join(' ')}</td>
-            <td>${r.fnStatus || ''}</td>
-            <td>${r.fnFeName || ''}</td>
-            <td>${r.fnScheduledDate || ''}</td>
-            <td>${r.fnScheduledTime || ''}</td>
-            <td>${pill(r.statusOk)}</td>
-            <td>${pill(r.dateValid)}</td>
-            <td>${pill(r.timeValid)}</td>
-            <td>${pill(r.nameValid)}</td>
-            <td>${r.exceptionApplied ? `<span class="pill warn">${r.exceptionType}</span>` : '<span class="pill ok">None</span>'}</td>
-            <td>${finalPill}</td>
-            <td>${r.issueDetails || ''}</td>
-          </tr>
-        `;
-      }).join('');
-
-      toolbarPanel.classList.remove('hidden');
-      tablePanel.classList.remove('hidden');
-    }
-
-    function applyFilters() {
-      const search = normalize(searchInput.value).toLowerCase();
-      const result = resultFilter.value;
-      const type = ticketTypeFilter.value;
-
-      state.filtered = state.raw.filter(r => {
-        const hitSearch = !search || [r.ticket, r.ieFeName, r.fnFeName].join(' ').toLowerCase().includes(search);
-        const hitType = type === 'all' || r.ticketType === type;
-        let hitResult = true;
-        if (result === 'error') hitResult = r.finalResult === 'Error';
-        if (result === 'matched') hitResult = r.finalResult === 'Matched';
-        if (result === 'exception') hitResult = r.exceptionApplied === true && r.finalResult === 'Matched';
-        return hitSearch && hitType && hitResult;
-      });
-
-      renderTable(state.filtered);
-    }
-
-    function exportErrorsCsv() {
-      const rows = state.raw.filter(r => r.finalResult === 'Error');
-      if (!rows.length) return;
-
-      const headers = [
-        'ticket','ticketType','assignedCompany','ieFnStatus','ieFeName','fnFeName',
-        'ieDueDate','ieDueTime','fnScheduledDate','fnScheduledTime',
-        'statusOk','dateValid','timeValid','nameValid','exceptionType','finalResult','issueDetails'
-      ];
-
-      const csv = [headers.join(',')].concat(
-        rows.map(r => headers.map(h => `"${String(r[h] ?? '').replaceAll('"', '""')}"`).join(','))
-      ).join('\n');
-
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'validation_errors.csv';
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    function parseReportSheet(rows) {
-      const mapped = [];
-
-      for (let i = 2; i < rows.length; i++) {
-        const row = rows[i] || [];
-        const ticket = row[0];
-        if (!ticket) continue;
-
-        const assignedCompany = normalize(row[12]);
-        if (assignedCompany.toUpperCase() !== 'FIELD NATION') continue;
-
-        const ticketType = normalize(row[5]).toUpperCase();
-        const ieFnStatus = normalize(row[26]);
-        const ieFeName = normalize(row[13]);
-        const fnFeName = normalize(row[23]);
-
-        const ieDueDate = parseDatePart(row[7]);
-        const ieDueTime = parseTimePart(row[8]);
-        const ieScheduledDate = parseDatePart(row[9]);
-        const ieScheduledTime = parseTimePart(row[10]);
-        const fnScheduledDate = parseDatePart(row[20]);
-        const fnScheduledTime = parseTimePart(row[21]);
-        const fnStatus = normalize(row[16]);
-
-        const statusOk = ieFnStatus === 'OK';
-        const dateComparable = Boolean(ieDueDate && fnScheduledDate);
-        const timeComparable = Boolean(ieDueTime && fnScheduledTime);
-        const nameComparable = Boolean(ieFeName || fnFeName);
-
-        const rawDateMatch = !dateComparable ? true : ieDueDate === fnScheduledDate;
-        const rawTimeMatch = !timeComparable ? true : ieDueTime === fnScheduledTime;
-
-        const dateException = !rawDateMatch && ticketType === 'ITD';
-        const timeException = !rawTimeMatch && (ticketType === 'ITD' || ticketType === 'ITR');
-
-        const dateValid = !dateComparable ? true : (rawDateMatch || dateException);
-        const timeValid = !timeComparable ? true : (rawTimeMatch || timeException);
-        const nameValid = !nameComparable ? true : normalizeName(ieFeName) === normalizeName(fnFeName);
-        const exceptionApplied = dateException || timeException;
-        const exceptionType = [
-          dateException ? 'ITD-Date' : '',
-          timeException ? `${ticketType}-Time` : ''
-        ].filter(Boolean).join(', ');
-        const finalResult = statusOk && dateValid && timeValid && nameValid ? 'Matched' : 'Error';
-
-        const issueDetails = [
-          !statusOk ? 'IE & FN Status is not OK' : '',
-          !dateValid ? 'Due Date ≠ FN Scheduled Date' : '',
-          !timeValid ? 'Due Time ≠ FN Scheduled Time' : '',
-          !nameValid ? 'IE FE Name ≠ FN FE Name' : '',
-          dateException ? 'Date mismatch accepted by ITD exception' : '',
-          timeException ? `Time mismatch accepted by ${ticketType} exception` : '',
-        ].filter(Boolean).join('; ') || 'All checks passed';
-
-        mapped.push({
-          ticket,
-          ticketType,
-          assignedCompany,
-          ieFnStatus,
-          ieFeName,
-          fnFeName,
-          ieDueDate,
-          ieDueTime,
-          ieScheduledDate,
-          ieScheduledTime,
-          fnScheduledDate,
-          fnScheduledTime,
-          fnStatus,
-          statusOk,
-          dateValid,
-          timeValid,
-          nameValid,
-          dateException,
-          timeException,
-          exceptionApplied,
-          exceptionType,
-          finalResult,
-          issueDetails
-        });
-      }
-
-      return mapped;
-    }
-
-    function handleWorkbook(file) {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const data = new Uint8Array(e.target.result);
-        const wb = XLSX.read(data, { type: 'array', cellDates: true });
-        const sheetName = wb.SheetNames.includes('Report') ? 'Report' : wb.SheetNames[0];
-        const sheet = wb.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
-        state.raw = parseReportSheet(rows);
-        buildCards(state.raw);
-        populateTicketTypes(state.raw);
-        applyFilters();
-      };
-      reader.readAsArrayBuffer(file);
-    }
-
-    dropzone.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', e => {
-      const file = e.target.files?.[0];
-      if (file) handleWorkbook(file);
-    });
-    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag'); });
-    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
-    dropzone.addEventListener('drop', e => {
-      e.preventDefault();
-      dropzone.classList.remove('drag');
-      const file = e.dataTransfer.files?.[0];
-      if (file) handleWorkbook(file);
-    });
-
-    el('applyBtn').addEventListener('click', applyFilters);
-    el('exportBtn').addEventListener('click', exportErrorsCsv);
-    searchInput.addEventListener('input', applyFilters);
-    resultFilter.addEventListener('change', applyFilters);
-    ticketTypeFilter.addEventListener('change', applyFilters);
-  </script>
+  <script src="app.js"></script>
 </body>
 </html>

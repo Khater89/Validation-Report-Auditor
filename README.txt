@@ -1,28 +1,33 @@
-Validation Report Project - Updated Exception Logic
+Validation Report Auditor v4
+============================
 
-Files included:
+What changed in this version
+----------------------------
+- No pop-up correction window.
+- Every open error row shows a "Correct" button.
+- After you fix the source externally, click "Correct" in the app.
+- The button changes immediately to "Corrected" and becomes green.
+- The row is counted as Corrected in statistics and export.
+- Export includes summary statistics, final report, corrected rows, and remaining open errors.
+- Outlook draft export (.eml) is included.
+
+How to use
+----------
+1. Open index.html in your browser.
+2. Upload the Excel workbook.
+3. Review rows with Final Result = Error.
+4. Fix the source outside the app if needed.
+5. Return to the app and click Correct for each handled row.
+6. Export the final XLSX report or Outlook email draft.
+
+Files
+-----
 - index.html
-- validation_report_04022026_custom_v2.xlsx
-- README.txt
+- app.js
+- styles.css
+- sample_input.xlsx
 
-How to use:
-1) Open index.html in a browser.
-2) Upload the source workbook that contains the Report sheet.
-3) The app will validate only rows where Assigned Company = Field Nation.
-
-Applied rules:
-- IE & FN Status must be OK.
-- IE Due Date must match FN Scheduled Date.
-- IE Due Time must match FN Scheduled Time.
-- IE FE Name must match FN FE Name after normalization.
-- Date mismatch is accepted only when Ticket Type = ITD.
-- Time mismatch is accepted when Ticket Type = ITD or ITR.
-
-Updated result on the provided file:
-- Comparable Tickets: 233
-- Matched: 185
-- Errors: 48
-- Completion: 79.4%
-- Time Exceptions Applied: 79
-  - ITD Time Exceptions: 78
-  - ITR Time Exceptions: 1
+Notes
+-----
+- The app works best with a workbook that contains a sheet named Report.
+- Tracking state is saved in browser localStorage per uploaded file.
