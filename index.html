@@ -92,15 +92,6 @@
         <input type="text" id="emailSubject" placeholder="Email subject" />
       </div>
 
-      <div class="footnote">
-        Validation rules: IE &amp; FN Status must be <strong>OK</strong>, IE Due Date must match FN Scheduled Date, IE Due Time must match FN Scheduled Time, and IE FE Name must match FN FE Name.
-        <br />
-        Exception rules: <strong>date mismatches</strong> are accepted only when Ticket Type = <strong>ITD</strong>. <strong>time mismatches</strong> are accepted when Ticket Type = <strong>ITD or ITR</strong>.
-        <br />
-        Action rule: for any row with an open error, click <strong>Correct</strong> after fixing the source externally. The button turns to <strong>Corrected</strong> and the row is tracked as completed for statistics and export. No pop-up is used.
-        <br />
-        Date handling rule: Excel dates are read as <strong>date-only values</strong> to avoid timezone shifts and day offset errors in production.
-      </div>
     </div>
 
     <div class="panel hidden" id="tablePanel">
