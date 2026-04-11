@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Validation Report 0001 — Excel Auditor</title>
+  <meta name="description" content="Side-by-side IE vs Field Nation audit with mismatch detection, correction tracking, charts, and Excel export." />
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+    :root {
+      --fn-primary: #f97316;
+      --fn-dark: #c2410c;
+      --fn-soft: #fff7ed;
+      --fn-border: #fed7aa;
+      --ie-primary: #3b82f6;
+      --ie-dark: #1d4ed8;
+      --ie-soft: #eff6ff;
+      --ie-border: #bfdbfe;
+      --ok: #22c55e;
+      --ok-soft: #dcfce7;
+      --ok-text: #15803d;
+      --err: #ef4444;
+      --err-soft: #fee2e2;
+      --err-text: #b91c1c;
+      --warn: #f59e0b;
+      --warn-soft: #fef3c7;
+      --warn-text: #92400e;
+      --corrected: #8b5cf6;
+      --corrected-soft: #ede9fe;
+      --corrected-text: #6d28d9;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface2: #f1f5f9;
+      --text: #0f172a;
+      --text2: #475569;
+      --text3: #94a3b8;
+      --border: #e2e8f0;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow: 0 4px 16px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04);
+      --shadow-lg: 0 10px 40px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-xs: 6px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ─── HEADER ─── */
+    .app-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-sm);
+    }
+    .header-inner {
+      max-width: 1800px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      gap: 20px;
+    }
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--fn-primary), var(--ie-primary));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .logo-text { font-weight: 800; font-size: 16px; color: var(--text); }
+    .logo-sub { font-size: 11px; color: var(--text3); font-weight: 500; }
+    .header-badges { display: flex; gap: 8px; }
+    .hbadge {
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .hbadge-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .hbadge.ie { background: var(--ie-soft); color: var(--ie-dark); border: 1px solid var(--ie-border); }
+    .hbadge.fn { background: var(--fn-soft); color: var(--fn-dark); border: 1px solid var(--fn-border); }
+    .hbadge-dot.ie { background: var(--ie-primary); }
+    .hbadge-dot.fn { background: var(--fn-primary); }
+
+    /* ─── RUNTIME BANNER ─── */
+    .runtime-banner {
+      background: var(--err-soft);
+      border: 1px solid #fecaca;
+      color: var(--err-text);
+      padding: 12px 24px;
+      font-weight: 600;
+      font-size: 13px;
+      display: none;
+    }
+    .runtime-banner.show { display: block; }
+
+    /* ─── MAIN LAYOUT ─── */
+    .main {
+      max-width: 1800px;
+      margin: 0 auto;
+      padding: 20px 24px 48px;
+    }
+
+    /* ─── DROPZONE ─── */
+    .dropzone-wrap { margin-bottom: 20px; }
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, var(--ie-soft) 0%, var(--fn-soft) 100%);
+      padding: 40px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .dropzone::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, var(--ie-primary) 0%, var(--fn-primary) 100%);
+      opacity: 0;
+      transition: opacity .2s ease;
+    }
+    .dropzone:hover, .dropzone.drag {
+      border-color: var(--fn-primary);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+    .dropzone:hover::before, .dropzone.drag::before { opacity: 0.04; }
+    .dropzone input { display: none; }
+    .dz-icon { font-size: 40px; margin-bottom: 12px; position: relative; }
+    .dz-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 8px;
+      position: relative;
+    }
+    .dz-sub { color: var(--text2); font-size: 13px; position: relative; }
+
+    /* ─── STATS DASHBOARD ─── */
+    .dashboard { margin-bottom: 20px; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+      transition: box-shadow .2s ease;
+    }
+    .stat-card:hover { box-shadow: var(--shadow); }
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .stat-card.total::after { background: var(--text3); }
+    .stat-card.matched::after { background: var(--ok); }
+    .stat-card.corrected::after { background: var(--corrected); }
+    .stat-card.errors::after { background: var(--err); }
+    .stat-card.exceptions::after { background: var(--warn); }
+    .stat-card.rate::after { background: linear-gradient(90deg, var(--ie-primary), var(--fn-primary)); }
+    .stat-card .stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text3); margin-bottom: 8px; }
+    .stat-card .stat-value { font-size: 32px; font-weight: 800; color: var(--text); font-family: 'JetBrains Mono', monospace; line-height: 1; }
+    .stat-card.matched .stat-value { color: var(--ok-text); }
+    .stat-card.corrected .stat-value { color: var(--corrected-text); }
+    .stat-card.errors .stat-value { color: var(--err-text); }
+    .stat-card.exceptions .stat-value { color: var(--warn-text); }
+    .stat-card .stat-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+    /* ─── CHART SECTION ─── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .chart-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 16px;
+    }
+    .chart-container { position: relative; height: 220px; }
+
+    /* ─── TOOLBAR PANEL ─── */
+    .toolbar-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 16px;
+    }
+    .toolbar-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: flex-end;
+      margin-bottom: 12px;
+    }
+    .toolbar-row:last-child { margin-bottom: 0; }
+    .field-grp {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .field-grp label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--text3);
+    }
+    .field-grp input, .field-grp select {
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--text);
+      background: var(--surface);
+      transition: border-color .15s ease;
+      outline: none;
+      min-width: 0;
+    }
+    .field-grp input:focus, .field-grp select:focus { border-color: var(--ie-primary); }
+    .search-grp { flex: 1; min-width: 220px; }
+    .scope-tag {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text3);
+      padding: 9px 14px;
+      background: var(--surface2);
+      border-radius: var(--radius-sm);
+      white-space: nowrap;
+    }
+
+    /* ─── BUTTONS ─── */
+    .btn {
+      padding: 9px 16px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: .6; cursor: default; transform: none !important; box-shadow: none !important; }
+    .btn-dark { background: var(--text); color: #fff; }
+    .btn-blue { background: var(--ie-primary); color: #fff; }
+    .btn-orange { background: var(--fn-primary); color: #fff; }
+    .btn-green { background: var(--ok); color: #fff; }
+    .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: var(--radius-xs); }
+
+    /* Email section */
+    .email-section {
+      border-top: 1px solid var(--border);
+      margin-top: 12px;
+      padding-top: 12px;
+    }
+    .email-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--text3);
+      margin-bottom: 8px;
+    }
+
+    /* ─── TABLE PANEL ─── */
+    .table-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .table-wrap {
+      overflow: auto;
+      max-height: 70vh;
+    }
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 12.5px;
+    }
+    thead th {
+      position: sticky;
+      background: #0f172a;
+      color: rgba(255,255,255,.85);
+      padding: 9px 11px;
+      text-align: left;
+      white-space: nowrap;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: .03em;
+      border-right: 1px solid rgba(255,255,255,.05);
+    }
+    thead tr.group-row th {
+      top: 0;
+      z-index: 4;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 8px 11px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    thead tr.col-row th {
+      top: 36px;
+      z-index: 3;
+    }
+    .g-core { background: #1e293b !important; }
+    .g-ie { background: #1d4ed8 !important; }
+    .g-fn { background: #c2410c !important; }
+    .g-val { background: #0f766e !important; }
+
+    tbody td {
+      padding: 9px 11px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      white-space: nowrap;
+      font-size: 12.5px;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr { transition: background .1s ease; }
+    tbody tr:hover { filter: brightness(.97); }
+    tbody tr.row-matched { background: #f0fdf4; }
+    tbody tr.row-error { background: #fff5f5; }
+    tbody tr.row-exception { background: #fffbeb; }
+    tbody tr.row-corrected { background: #faf5ff; }
+
+    /* Cell highlighting for mismatches */
+    td.mismatch { background: rgba(239,68,68,.12) !important; color: var(--err-text); font-weight: 600; }
+    td.matched-cell { background: rgba(34,197,94,.07) !important; }
+
+    /* ─── PILLS ─── */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .pill.ok { background: var(--ok-soft); color: var(--ok-text); }
+    .pill.err { background: var(--err-soft); color: var(--err-text); }
+    .pill.warn { background: var(--warn-soft); color: var(--warn-text); }
+    .pill.corrected { background: var(--corrected-soft); color: var(--corrected-text); }
+    .pill.matched { background: var(--ok-soft); color: var(--ok-text); }
+    .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    /* ─── ACTION BUTTONS ─── */
+    .action-btn {
+      padding: 5px 12px;
+      border: none;
+      border-radius: var(--radius-xs);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .15s ease;
+      min-width: 88px;
+    }
+    .action-btn.mark { background: var(--text); color: #fff; }
+    .action-btn.mark:hover { background: #374151; }
+    .action-btn.done { background: var(--corrected-soft); color: var(--corrected-text); cursor: default; }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text3);
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .details-cell, .note-cell {
+      max-width: 260px;
+      white-space: normal;
+      line-height: 1.45;
+      font-size: 11px;
+      color: var(--text2);
+    }
+
+    /* ─── HIDDEN ─── */
+    .hidden { display: none !important; }
+
+    /* ─── PROGRESS BAR ─── */
+    .progress-wrap { margin-bottom: 12px; }
+    .progress-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); font-weight: 600; margin-bottom: 6px; }
+    .progress-track {
+      height: 8px;
+      background: var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--ie-primary), var(--fn-primary));
+      transition: width .4s ease;
+    }
+
+    /* ─── FILTER BAR NOTE ─── */
+    .filter-note {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 8px;
+      line-height: 1.6;
+    }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 1200px) {
+      .toolbar-row { flex-direction: column; align-items: stretch; }
+      .charts-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 720px) {
+      .main { padding: 12px 12px 40px; }
+      .header-inner { height: auto; padding: 12px 0; flex-wrap: wrap; }
+      .charts-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="app-header">
+  <div class="header-inner">
+    <div class="header-logo">
+      <div class="logo-icon">📊</div>
+      <div>
+        <div class="logo-text">Validation Report 0001</div>
+        <div class="logo-sub">Excel Auditor — IE vs Field Nation</div>
+      </div>
+    </div>
+    <div class="header-badges">
+      <span class="hbadge ie"><span class="hbadge-dot ie"></span>IE = Blue</span>
+      <span class="hbadge fn"><span class="hbadge-dot fn"></span>Field Nation = Orange</span>
+    </div>
+  </div>
+</header>
+
+<!-- RUNTIME BANNER -->
+<div id="runtimeBanner" class="runtime-banner"></div>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- DROPZONE -->
+  <div class="dropzone-wrap">
+    <label class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" accept=".xlsx,.xls" />
+      <div class="dz-icon">📂</div>
+      <div class="dz-title">Drag & drop your Excel workbook here</div>
+      <div class="dz-sub">Or click to browse &nbsp;·&nbsp; Expects a <strong>Report</strong> sheet with Field Nation and IE data side by side</div>
+    </label>
+  </div>
+
+  <!-- DASHBOARD (hidden until data loaded) -->
+  <div class="dashboard hidden" id="dashboard">
+
+    <!-- STATS -->
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <!-- PROGRESS BAR -->
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-label">
+        <span>Completion Rate</span>
+        <span id="progressLabel">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-bar" id="progressBar" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="charts-grid" id="chartsGrid">
+      <div class="chart-card">
+        <div class="chart-title">Validation Results</div>
+        <div class="chart-container"><canvas id="chartPie"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Error Breakdown</div>
+        <div class="chart-container"><canvas id="chartBar"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Ticket Type Distribution</div>
+        <div class="chart-container"><canvas id="chartType"></canvas></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TOOLBAR (hidden until data loaded) -->
+  <div class="toolbar-panel hidden" id="toolbarPanel">
+
+    <!-- Row 1: Search + Ticket Type + Status + Scope -->
+    <div class="toolbar-row">
+      <div class="field-grp search-grp">
+        <label>Search</label>
+        <input type="text" id="searchInput" placeholder="Ticket number, name…" />
+      </div>
+      <div class="field-grp">
+        <label>Ticket Type</label>
+        <select id="ticketTypeFilter"><option value="all">All Types</option></select>
+      </div>
+      <div class="field-grp">
+        <label>Status Filter</label>
+        <select id="statusFilter">
+          <option value="all">All Rows</option>
+          <option value="errors">Errors Only</option>
+          <option value="corrected">Corrected Only</option>
+          <option value="matched">Matched Only</option>
+          <option value="exception">Exception Matches</option>
+        </select>
+      </div>
+      <div class="field-grp">
+        <label>Specific Date</label>
+        <input type="date" id="specificDateFilter" />
+      </div>
+      <div class="field-grp">
+        <label>From Date</label>
+        <input type="date" id="fromDateFilter" />
+      </div>
+      <div class="field-grp">
+        <label>To Date</label>
+        <input type="date" id="toDateFilter" />
+      </div>
+      <div class="scope-tag" id="scopeTag">0 of 0 tickets</div>
+    </div>
+
+    <!-- Row 2: Actions -->
+    <div class="toolbar-row">
+      <button class="btn btn-dark" id="applyBtn">🔍 Apply Filters</button>
+      <button class="btn btn-ghost" id="clearBtn">✕ Clear Filters</button>
+      <button class="btn btn-blue" id="exportXlsxBtn">⬇ Export XLSX</button>
+      <button class="btn btn-orange" id="exportEmailBtn">📧 Export Email (.eml)</button>
+    </div>
+
+    <!-- Email draft fields -->
+    <div class="email-section">
+      <div class="email-label">Outlook Email Draft</div>
+      <div class="toolbar-row" style="margin-bottom:0">
+        <div class="field-grp" style="flex:1">
+          <input type="text" id="emailTo" placeholder="To:" />
+        </div>
+        <div class="field-grp" style="flex:1">
+          <input type="text" id="emailCc" placeholder="CC:" />
+        </div>
+        <div class="field-grp" style="flex:2">
+          <input type="text" id="emailSubject" placeholder="Subject" />
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-note">
+      📅 Date filter uses <strong>FN Scheduled Date</strong> first, then <strong>IE Due Date</strong> as fallback.
+      &nbsp;·&nbsp; ⚡ ITD tickets always pass date validation.
+    </div>
+
+  </div>
+
+  <!-- TABLE PANEL (hidden until data loaded) -->
+  <div class="table-panel hidden" id="tablePanel">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr class="group-row">
+            <th class="g-core" colspan="5">Core</th>
+            <th class="g-ie" colspan="5">Internal Entity (IE) — Blue</th>
+            <th class="g-fn" colspan="4">Field Nation (FN) — Orange</th>
+            <th class="g-val" colspan="9">Validation &amp; Tracking</th>
+          </tr>
+          <tr class="col-row">
+            <th>Row#</th>
+            <th>Ticket</th>
+            <th>Type</th>
+            <th>Company</th>
+            <th>Filter Date</th>
+            <th>IE &amp; FN Status</th>
+            <th>IE FE Name</th>
+            <th>IE Due Date</th>
+            <th>IE Due Time</th>
+            <th>IE Scheduled</th>
+            <th>FN Status</th>
+            <th>FN FE Name</th>
+            <th>FN Sched. Date</th>
+            <th>FN Sched. Time</th>
+            <th>Status ✓</th>
+            <th>Date ✓</th>
+            <th>Time ✓</th>
+            <th>Name ✓</th>
+            <th>Exception</th>
+            <th>Result</th>
+            <th>Details</th>
+            <th>Note</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+const state = {
+  raw: [],
+  filtered: [],
+  fileMeta: null,
+  charts: { pie: null, bar: null, type: null },
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+
+function norm(v) { return (v ?? '').toString().trim().replace(/\s+/g, ' '); }
+function normUp(v) { return norm(v).toUpperCase(); }
+function esc(v) {
+  return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function pad2(n) { return String(n).padStart(2,'0'); }
+function ts() { return new Date().toLocaleString(); }
+
+function showBanner(msg) {
+  const b = $('runtimeBanner');
+  b.textContent = msg;
+  b.classList.add('show');
+}
+function hideBanner() {
+  const b = $('runtimeBanner');
+  b.textContent = '';
+  b.classList.remove('show');
+}
+
+// ─── DATE UTILITIES (Day-1-Offset safe) ───
+function fmtDate(y, m, d) { return `${y}-${pad2(m)}-${pad2(d)}`; }
+function fmtDateLocal(date) { return fmtDate(date.getFullYear(), date.getMonth()+1, date.getDate()); }
+function fmtDateUTC(date) { return fmtDate(date.getUTCFullYear(), date.getUTCMonth()+1, date.getUTCDate()); }
+
+function excelSerial(v) {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+  const days = Math.floor(v);
+  const adj = days >= 60 ? days - 1 : days;
+  return new Date(Date.UTC(1899, 11, 31) + adj * 86400000);
+}
+
+function parseDatePart(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date) return fmtDateLocal(v);
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const d = excelSerial(v);
+    return d ? fmtDateUTC(d) : '';
+  }
+  const t = norm(v);
+  if (!t) return '';
+  const iso = t.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (iso) return fmtDate(iso[1], iso[2], iso[3]);
+  const slash = t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (slash) {
+    let yr = slash[3]; if (yr.length === 2) yr = `20${yr}`;
+    const a = +slash[1], b = +slash[2];
+    return fmtDate(yr, a>12?b:a, a>12?a:b);
+  }
+  const word = t.match(/^([A-Za-z]{3,9})\s+(\d{1,2}),\s*(\d{4})$/);
+  if (word) { const d = new Date(t); return isNaN(d.getTime()) ? t : fmtDateLocal(d); }
+  return t;
+}
+
+function parseTimePart(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date) return `${pad2(v.getHours())}:${pad2(v.getMinutes())}`;
+  if (typeof v === 'string') {
+    const t = norm(v).toUpperCase();
+    const ampm = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+    if (ampm) {
+      let h = +ampm[1]; const mn = ampm[2], s = ampm[3];
+      if (s === 'PM' && h < 12) h += 12;
+      if (s === 'AM' && h === 12) h = 0;
+      return `${pad2(h)}:${mn}`;
+    }
+    const m = t.match(/(\d{1,2}):(\d{2})/);
+    if (m) return `${pad2(+m[1])}:${m[2]}`;
+    return t;
+  }
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const tot = Math.round(v * 24 * 60);
+    return `${pad2(Math.floor(tot/60)%24)}:${pad2(tot%60)}`;
+  }
+  return norm(v);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  VALIDATION LOGIC
+// ═══════════════════════════════════════════════════════════════
+function defaultTracking() { return { correctedMarked: false, correctedAt: '' }; }
+
+function recomputeRow(row) {
+  const statusOk = normUp(row.ieFnStatus) === 'OK';
+  const hasDate = !!(row.ieDueDate && row.fnScheduledDate);
+  const hasTime = !!(row.ieDueTime && row.fnScheduledTime);
+  const hasName = !!(row.ieFeName || row.fnFeName);
+
+  const rawDateMatch = !hasDate ? true : row.ieDueDate === row.fnScheduledDate;
+  const rawTimeMatch = !hasTime ? true : row.ieDueTime === row.fnScheduledTime;
+
+  const dateExc = !rawDateMatch && row.ticketType === 'ITD';
+  const timeExc = !rawTimeMatch && (row.ticketType === 'ITD' || row.ticketType === 'ITR');
+
+  const dateValid = !hasDate ? true : (rawDateMatch || dateExc);
+  const timeValid = !hasTime ? true : (rawTimeMatch || timeExc);
+  const nameValid = !hasName ? true : normUp(row.ieFeName) === normUp(row.fnFeName);
+
+  row.statusOk = statusOk;
+  row.dateValid = dateValid;
+  row.timeValid = timeValid;
+  row.nameValid = nameValid;
+  row.dateException = dateExc;
+  row.timeException = timeExc;
+  row.exceptionApplied = dateExc || timeExc;
+  row.exceptionType = [dateExc ? 'ITD-Date' : '', timeExc ? `${row.ticketType}-Time` : ''].filter(Boolean).join(', ');
+
+  const errs = [
+    !statusOk ? 'Status ≠ OK' : '',
+    !dateValid ? 'Due Date ≠ FN Date' : '',
+    !timeValid ? 'Due Time ≠ FN Time' : '',
+    !nameValid ? 'IE Name ≠ FN Name' : '',
+  ].filter(Boolean);
+
+  row.validationResult = errs.length ? 'Error' : 'Matched';
+  row.baseIssueDetails = errs.length
+    ? errs.join('; ')
+    : (row.exceptionApplied ? `Matched via ${row.exceptionType}` : 'All checks passed');
+
+  if (row.validationResult === 'Error' && row.tracking.correctedMarked) {
+    row.finalResult = 'Corrected';
+    row.issueDetails = `${row.baseIssueDetails}; Corrected by user`;
+    row.trackingNote = `Corrected on ${row.tracking.correctedAt}`;
+  } else {
+    row.finalResult = row.validationResult;
+    row.issueDetails = row.baseIssueDetails;
+    row.trackingNote = row.tracking.correctedMarked ? `Corrected on ${row.tracking.correctedAt}` : 'Pending';
+  }
+  if (row.exceptionApplied && !row.issueDetails.includes(row.exceptionType)) {
+    row.issueDetails += `; ${row.exceptionType}`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PARSE WORKBOOK
+// ═══════════════════════════════════════════════════════════════
+function parseReportSheet(rows) {
+  const out = [];
+  for (let i = 2; i < rows.length; i++) {
+    const r = rows[i] || [];
+    const ticket = r[0]; if (!ticket) continue;
+    const company = normUp(r[12]);
+    if (company !== 'FIELD NATION') continue;
+    const fnSched = parseDatePart(r[20]);
+    const ieDue   = parseDatePart(r[7]);
+    const row = {
+      rowId: `r${i}`,
+      sourceRowNumber: i + 1,
+      ticket,
+      ticketType: normUp(r[5]),
+      assignedCompany: norm(r[12]),
+      ieFnStatus: norm(r[26]),
+      ieFeName: norm(r[13]),
+      fnFeName: norm(r[23]),
+      ieDueDate: ieDue,
+      ieDueTime: parseTimePart(r[8]),
+      ieScheduledDate: parseDatePart(r[9]),
+      ieScheduledTime: parseTimePart(r[10]),
+      fnScheduledDate: fnSched,
+      fnScheduledTime: parseTimePart(r[21]),
+      fnStatus: norm(r[16]),
+      filterDate: fnSched || ieDue || '',
+      tracking: defaultTracking(),
+    };
+    recomputeRow(row);
+    out.push(row);
+  }
+  return out;
+}
+
+function handleWorkbook(file) {
+  if (typeof XLSX === 'undefined') { showBanner('Excel library failed to load. Refresh and try again.'); return; }
+  hideBanner();
+  state.fileMeta = { name: file.name, size: file.size, lastModified: file.lastModified };
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const wb = XLSX.read(new Uint8Array(ev.target.result), { type:'array', cellDates:false });
+      const sn = wb.SheetNames.includes('Report') ? 'Report' : wb.SheetNames[0];
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header:1, raw:false, defval:'', dateNF:'yyyy-mm-dd' });
+      state.raw = parseReportSheet(rows);
+      if (!state.raw.length) {
+        showBanner('No Field Nation rows found. Confirm the workbook contains a "Report" sheet and Assigned Company = "Field Nation".');
+        return;
+      }
+      populateTicketTypes();
+      loadPersistedState();
+      if (!norm($('emailSubject').value)) {
+        $('emailSubject').value = `Final Validation Report — ${file.name.replace(/\.[^.]+$/,'')}`;
+      }
+      ['dashboard','toolbarPanel','tablePanel'].forEach(id => $(id).classList.remove('hidden'));
+      applyFilters();
+    } catch (err) {
+      showBanner(`Failed to load workbook: ${err.message || err}`);
+    }
+  };
+  reader.onerror = () => showBanner('File could not be read. Try again.');
+  reader.readAsArrayBuffer(file);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FILTERS
+// ═══════════════════════════════════════════════════════════════
+function populateTicketTypes() {
+  const cur = $('ticketTypeFilter').value || 'all';
+  const types = [...new Set(state.raw.map(r => r.ticketType).filter(Boolean))].sort();
+  $('ticketTypeFilter').innerHTML = '<option value="all">All Types</option>' +
+    types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  $('ticketTypeFilter').value = types.includes(cur) ? cur : 'all';
+}
+
+function applyFilters() {
+  const search = norm($('searchInput').value).toLowerCase();
+  const type   = $('ticketTypeFilter').value;
+  const specific = $('specificDateFilter').value;
+  const from   = $('fromDateFilter').value;
+  const to     = $('toDateFilter').value;
+  const status = $('statusFilter').value;
+
+  state.filtered = state.raw.filter(r => {
+    if (search && !`${r.ticket} ${r.ieFeName} ${r.fnFeName}`.toLowerCase().includes(search)) return false;
+    if (type !== 'all' && r.ticketType !== type) return false;
+    const d = r.filterDate || '';
+    if (specific && d !== specific) return false;
+    if (from && d && d < from) return false;
+    if (to && d && d > to) return false;
+    if (status === 'errors' && r.finalResult !== 'Error') return false;
+    if (status === 'corrected' && r.finalResult !== 'Corrected') return false;
+    if (status === 'matched' && r.finalResult !== 'Matched') return false;
+    if (status === 'exception' && !(r.exceptionApplied && r.finalResult === 'Matched')) return false;
+    return true;
+  });
+
+  renderStats(state.filtered);
+  renderCharts(state.filtered);
+  renderTable(state.filtered);
+  $('scopeTag').textContent = `${state.filtered.length} of ${state.raw.length} tickets`;
+  persistState();
+}
+
+function clearFilters() {
+  ['searchInput','specificDateFilter','fromDateFilter','toDateFilter'].forEach(id => $(id).value = '');
+  $('ticketTypeFilter').value = 'all';
+  $('statusFilter').value = 'all';
+  applyFilters();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STATS
+// ═══════════════════════════════════════════════════════════════
+function computeStats(rows) {
+  const total = rows.length;
+  const matched   = rows.filter(r => r.finalResult === 'Matched').length;
+  const corrected = rows.filter(r => r.finalResult === 'Corrected').length;
+  const errors    = rows.filter(r => r.finalResult === 'Error').length;
+  const exceptions= rows.filter(r => r.exceptionApplied).length;
+  const completion= total ? (((matched + corrected) / total) * 100).toFixed(1) : '0.0';
+  const statusErr = rows.filter(r => !r.statusOk).length;
+  const dateErr   = rows.filter(r => !r.dateValid).length;
+  const timeErr   = rows.filter(r => !r.timeValid).length;
+  const nameErr   = rows.filter(r => !r.nameValid).length;
+  return { total, matched, corrected, errors, exceptions, completion, statusErr, dateErr, timeErr, nameErr };
+}
+
+function renderStats(rows) {
+  const s = computeStats(rows);
+  $('statsGrid').innerHTML = `
+    <div class="stat-card total"><div class="stat-label">Tickets</div><div class="stat-value">${s.total}</div></div>
+    <div class="stat-card matched"><div class="stat-label">Matched</div><div class="stat-value">${s.matched}</div></div>
+    <div class="stat-card corrected"><div class="stat-label">Corrected</div><div class="stat-value">${s.corrected}</div></div>
+    <div class="stat-card errors"><div class="stat-label">Open Errors</div><div class="stat-value">${s.errors}</div></div>
+    <div class="stat-card exceptions"><div class="stat-label">Exceptions</div><div class="stat-value">${s.exceptions}</div></div>
+    <div class="stat-card rate"><div class="stat-label">Completion</div><div class="stat-value">${s.completion}%</div><div class="stat-sub">(matched + corrected)</div></div>
+    <div class="stat-card"><div class="stat-label">Status Errors</div><div class="stat-value" style="font-size:22px;color:var(--err-text)">${s.statusErr}</div></div>
+    <div class="stat-card"><div class="stat-label">Date Errors</div><div class="stat-value" style="font-size:22px;color:var(--err-text)">${s.dateErr}</div></div>
+    <div class="stat-card"><div class="stat-label">Time Errors</div><div class="stat-value" style="font-size:22px;color:var(--err-text)">${s.timeErr}</div></div>
+    <div class="stat-card"><div class="stat-label">Name Errors</div><div class="stat-value" style="font-size:22px;color:var(--err-text)">${s.nameErr}</div></div>
+  `;
+  const pct = parseFloat(s.completion);
+  $('progressBar').style.width = `${pct}%`;
+  $('progressLabel').textContent = `${s.completion}%`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CHARTS
+// ═══════════════════════════════════════════════════════════════
+const CHART_COLORS = {
+  matched:   '#22c55e',
+  corrected: '#8b5cf6',
+  errors:    '#ef4444',
+  exception: '#f59e0b',
+  status:    '#f97316',
+  date:      '#3b82f6',
+  time:      '#6366f1',
+  name:      '#ec4899',
+};
+
+function destroyChart(key) {
+  if (state.charts[key]) { state.charts[key].destroy(); state.charts[key] = null; }
+}
+
+function renderCharts(rows) {
+  const s = computeStats(rows);
+
+  // PIE — validation results
+  destroyChart('pie');
+  state.charts.pie = new Chart($('chartPie'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Matched','Corrected','Open Errors','Exceptions'],
+      datasets:[{
+        data: [s.matched, s.corrected, s.errors, s.exceptions],
+        backgroundColor: [CHART_COLORS.matched, CHART_COLORS.corrected, CHART_COLORS.errors, CHART_COLORS.exception],
+        borderWidth: 2, borderColor: '#fff',
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position:'right', labels:{ font:{ family:'Space Grotesk', size:11 }, padding:10 } } }
+    }
+  });
+
+  // BAR — error breakdown
+  destroyChart('bar');
+  state.charts.bar = new Chart($('chartBar'), {
+    type: 'bar',
+    data: {
+      labels: ['Status','Date','Time','Name'],
+      datasets:[{
+        label: 'Errors',
+        data: [s.statusErr, s.dateErr, s.timeErr, s.nameErr],
+        backgroundColor: [CHART_COLORS.status, CHART_COLORS.date, CHART_COLORS.time, CHART_COLORS.name],
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend:{ display:false } },
+      scales: {
+        y: { beginAtZero:true, ticks:{ font:{ family:'Space Grotesk' } } },
+        x: { ticks:{ font:{ family:'Space Grotesk' } } }
+      }
+    }
+  });
+
+  // BAR — ticket type distribution
+  destroyChart('type');
+  const typeCounts = {};
+  rows.forEach(r => { typeCounts[r.ticketType || 'Unknown'] = (typeCounts[r.ticketType || 'Unknown'] || 0) + 1; });
+  const typeLabels = Object.keys(typeCounts).sort();
+  const typeColors = ['#3b82f6','#f97316','#8b5cf6','#22c55e','#f59e0b','#ec4899','#06b6d4'];
+  state.charts.type = new Chart($('chartType'), {
+    type: 'bar',
+    data: {
+      labels: typeLabels,
+      datasets:[{
+        label: 'Tickets',
+        data: typeLabels.map(t => typeCounts[t]),
+        backgroundColor: typeLabels.map((_,i) => typeColors[i % typeColors.length]),
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend:{ display:false } },
+      scales: {
+        y: { beginAtZero:true, ticks:{ font:{ family:'Space Grotesk' } } },
+        x: { ticks:{ font:{ family:'Space Grotesk', size:10 } } }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TABLE RENDER
+// ═══════════════════════════════════════════════════════════════
+function pill(type, label) {
+  return `<span class="pill ${type}"><span class="pill-dot"></span>${esc(label)}</span>`;
+}
+
+function resultPill(row) {
+  if (row.finalResult === 'Corrected') return pill('corrected','Corrected');
+  if (row.finalResult === 'Error')     return pill('err','Error');
+  if (row.exceptionApplied)           return pill('warn','Exception');
+  return pill('ok','Matched');
+}
+
+function cellClass(valid, exception) {
+  if (exception) return '';
+  return valid ? '' : 'mismatch';
+}
+
+function renderTable(rows) {
+  const body = $('resultsBody');
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="23" class="empty-state">No rows match the current filters.</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = rows.map(row => {
+    const rowClass = row.finalResult === 'Corrected' ? 'row-corrected'
+                   : row.finalResult === 'Error'     ? 'row-error'
+                   : row.exceptionApplied            ? 'row-exception'
+                   :                                   'row-matched';
+    const actionBtn = row.finalResult === 'Corrected'
+      ? `<button class="action-btn done" disabled>✓ Corrected</button>`
+      : row.validationResult === 'Error'
+      ? `<button class="action-btn mark" data-cid="${esc(row.rowId)}">Correct</button>`
+      : `<span style="color:var(--text3);font-size:11px">—</span>`;
+
+    return `<tr class="${rowClass}">
+      <td style="color:var(--text3);font-size:11px">${esc(row.sourceRowNumber)}</td>
+      <td><strong>${esc(row.ticket)}</strong></td>
+      <td>${esc(row.ticketType)}</td>
+      <td style="font-size:11px;color:var(--text2)">${esc(row.assignedCompany)}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(row.filterDate)}</td>
+      <td class="${row.statusOk?'':'mismatch'}">${esc(row.ieFnStatus)}</td>
+      <td class="${cellClass(row.nameValid, false)}">${esc(row.ieFeName)}</td>
+      <td class="${cellClass(row.dateValid, row.dateException)}" style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(row.ieDueDate)}</td>
+      <td class="${cellClass(row.timeValid, row.timeException)}" style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(row.ieDueTime)}</td>
+      <td style="font-size:11px;color:var(--text2)">${esc([row.ieScheduledDate,row.ieScheduledTime].filter(Boolean).join(' '))}</td>
+      <td style="font-size:11px">${esc(row.fnStatus)}</td>
+      <td class="${cellClass(row.nameValid, false)}">${esc(row.fnFeName)}</td>
+      <td class="${cellClass(row.dateValid, row.dateException)}" style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(row.fnScheduledDate)}</td>
+      <td class="${cellClass(row.timeValid, row.timeException)}" style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(row.fnScheduledTime)}</td>
+      <td>${row.statusOk ? pill('ok','OK') : pill('err','Error')}</td>
+      <td>${row.dateValid ? pill(row.dateException?'warn':'ok', row.dateException?'ITD':'OK') : pill('err','Error')}</td>
+      <td>${row.timeValid ? pill(row.timeException?'warn':'ok', row.timeException?row.ticketType:'OK') : pill('err','Error')}</td>
+      <td>${row.nameValid ? pill('ok','OK') : pill('err','Error')}</td>
+      <td>${row.exceptionApplied ? pill('warn', row.exceptionType) : '<span style="color:var(--text3);font-size:11px">—</span>'}</td>
+      <td>${resultPill(row)}</td>
+      <td class="details-cell">${esc(row.issueDetails)}</td>
+      <td class="note-cell">${esc(row.trackingNote)}</td>
+      <td>${actionBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CORRECTION TRACKING
+// ═══════════════════════════════════════════════════════════════
+function markCorrected(rowId) {
+  const row = state.raw.find(r => r.rowId === rowId);
+  if (!row || row.validationResult !== 'Error' || row.tracking.correctedMarked) return;
+  row.tracking.correctedMarked = true;
+  row.tracking.correctedAt = ts();
+  recomputeRow(row);
+  persistState();
+  applyFilters();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PERSISTENCE
+// ═══════════════════════════════════════════════════════════════
+function storageKey() {
+  if (!state.fileMeta) return null;
+  const { name, size, lastModified } = state.fileMeta;
+  return `vra:${name}:${size}:${lastModified}`;
+}
+
+function persistState() {
+  const key = storageKey(); if (!key) return;
+  try {
+    localStorage.setItem(key, JSON.stringify({
+      emailTo: $('emailTo').value || '',
+      emailCc: $('emailCc').value || '',
+      emailSubject: $('emailSubject').value || '',
+      filters: {
+        search: $('searchInput').value || '',
+        type:   $('ticketTypeFilter').value || 'all',
+        specific: $('specificDateFilter').value || '',
+        from:   $('fromDateFilter').value || '',
+        to:     $('toDateFilter').value || '',
+        status: $('statusFilter').value || 'all',
+      },
+      tracking: state.raw.reduce((a, r) => {
+        if (r.tracking.correctedMarked) a[r.rowId] = r.tracking; return a;
+      }, {}),
+    }));
+  } catch (_) {}
+}
+
+function loadPersistedState() {
+  const key = storageKey(); if (!key) return;
+  try {
+    const raw = localStorage.getItem(key); if (!raw) return;
+    const p = JSON.parse(raw);
+    state.raw.forEach(r => {
+      r.tracking = p.tracking?.[r.rowId] ? { ...defaultTracking(), ...p.tracking[r.rowId] } : defaultTracking();
+      recomputeRow(r);
+    });
+    $('emailTo').value = p.emailTo || '';
+    $('emailCc').value = p.emailCc || '';
+    $('emailSubject').value = p.emailSubject || '';
+    $('searchInput').value = p.filters?.search || '';
+    $('ticketTypeFilter').value = p.filters?.type || 'all';
+    $('specificDateFilter').value = p.filters?.specific || '';
+    $('fromDateFilter').value = p.filters?.from || '';
+    $('toDateFilter').value = p.filters?.to || '';
+    $('statusFilter').value = p.filters?.status || 'all';
+  } catch (_) {}
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EXPORT — XLSX
+// ═══════════════════════════════════════════════════════════════
+function autoWidth(ws, rows) {
+  const w = [];
+  rows.forEach(r => Object.values(r).forEach((v, i) => { w[i] = Math.min(Math.max(w[i]||10, String(v??'').length+2), 40); }));
+  ws['!cols'] = w.map(wch => ({ wch }));
+}
+
+function makeExportRows(rows) {
+  return rows.map(r => ({
+    'Excel Row': r.sourceRowNumber,
+    'Ticket': r.ticket,
+    'Ticket Type': r.ticketType,
+    'Assigned Company': r.assignedCompany,
+    'Filter Date': r.filterDate,
+    'IE & FN Status': r.ieFnStatus,
+    'IE FE Name': r.ieFeName,
+    'IE Due Date': r.ieDueDate,
+    'IE Due Time': r.ieDueTime,
+    'FN Status': r.fnStatus,
+    'FN FE Name': r.fnFeName,
+    'FN Scheduled Date': r.fnScheduledDate,
+    'FN Scheduled Time': r.fnScheduledTime,
+    'Status Check': r.statusOk ? 'OK' : 'Error',
+    'Date Check': r.dateValid ? (r.dateException ? 'OK via ITD' : 'OK') : 'Error',
+    'Time Check': r.timeValid ? (r.timeException ? `OK via ${r.ticketType}` : 'OK') : 'Error',
+    'Name Check': r.nameValid ? 'OK' : 'Error',
+    'Exception': r.exceptionType || 'None',
+    'Validation': r.validationResult,
+    'Final Result': r.finalResult,
+    'Details': r.issueDetails,
+    'Tracking Note': r.trackingNote,
+  }));
+}
+
+function buildSummaryRows(s, sv) {
+  return [
+    ['Metric', 'All Data', 'Current Filter'],
+    ['Total Tickets', s.total, sv.total],
+    ['Matched', s.matched, sv.matched],
+    ['Corrected', s.corrected, sv.corrected],
+    ['Open Errors', s.errors, sv.errors],
+    ['Exceptions', s.exceptions, sv.exceptions],
+    ['Completion %', s.completion, sv.completion],
+    ['Status Errors', s.statusErr, sv.statusErr],
+    ['Date Errors', s.dateErr, sv.dateErr],
+    ['Time Errors', s.timeErr, sv.timeErr],
+    ['Name Errors', s.nameErr, sv.nameErr],
+    [''],
+    ['File', state.fileMeta?.name || '', ''],
+    ['Generated At', new Date().toLocaleString(), ''],
+    ['Search', $('searchInput').value || 'none', ''],
+    ['Specific Date', $('specificDateFilter').value || 'none', ''],
+    ['From Date', $('fromDateFilter').value || 'none', ''],
+    ['To Date', $('toDateFilter').value || 'none', ''],
+    ['Status Filter', $('statusFilter').value, ''],
+    ['Ticket Type', $('ticketTypeFilter').value, ''],
+  ];
+}
+
+function getChartImageURL(key) {
+  try {
+    const ch = state.charts[key];
+    return ch ? ch.toBase64Image('image/png', 1) : null;
+  } catch (_) { return null; }
+}
+
+function buildWorkbook() {
+  const wb = XLSX.utils.book_new();
+  const s  = computeStats(state.raw);
+  const sv = computeStats(state.filtered);
+
+  const summaryRows = buildSummaryRows(s, sv);
+  const allRows     = makeExportRows(state.raw);
+  const errRows     = makeExportRows(state.raw.filter(r => r.finalResult === 'Error'));
+  const corRows     = makeExportRows(state.raw.filter(r => r.finalResult === 'Corrected'));
+  const visRows     = makeExportRows(state.filtered);
+
+  const wsSum = XLSX.utils.aoa_to_sheet(summaryRows);
+  wsSum['!cols'] = [{ wch:28 },{ wch:20 },{ wch:20 }];
+
+  const wsAll = XLSX.utils.json_to_sheet(allRows);
+  autoWidth(wsAll, allRows);
+
+  const wsVis = XLSX.utils.json_to_sheet(visRows.length ? visRows : [{ Info:'No rows in filter view' }]);
+  autoWidth(wsVis, visRows.length ? visRows : [{ Info:'' }]);
+
+  const wsErr = XLSX.utils.json_to_sheet(errRows.length ? errRows : [{ Info:'No open errors' }]);
+  autoWidth(wsErr, errRows.length ? errRows : [{ Info:'' }]);
+
+  const wsCor = XLSX.utils.json_to_sheet(corRows.length ? corRows : [{ Info:'No corrected rows yet' }]);
+  autoWidth(wsCor, corRows.length ? corRows : [{ Info:'' }]);
+
+  XLSX.utils.book_append_sheet(wb, wsSum,  'Summary');
+  XLSX.utils.book_append_sheet(wb, wsAll,  'Final_Report');
+  XLSX.utils.book_append_sheet(wb, wsVis,  'Current_Filter_View');
+  XLSX.utils.book_append_sheet(wb, wsErr,  'Open_Errors');
+  XLSX.utils.book_append_sheet(wb, wsCor,  'Corrected_Rows');
+
+  return wb;
+}
+
+function stamp() {
+  const n = new Date();
+  return `${n.getFullYear()}${pad2(n.getMonth()+1)}${pad2(n.getDate())}_${pad2(n.getHours())}${pad2(n.getMinutes())}`;
+}
+
+function download(blob, name) {
+  const u = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = u; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(u), 500);
+}
+
+function exportXlsx() {
+  if (!state.raw.length || typeof XLSX === 'undefined') return;
+  const wb  = buildWorkbook();
+  const buf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+  download(new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    `validation_report_${stamp()}.xlsx`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EXPORT — EMAIL (.eml)
+// ═══════════════════════════════════════════════════════════════
+function b64(buf) {
+  let b = '', u = new Uint8Array(buf);
+  for (let i = 0; i < u.length; i += 0x8000) b += String.fromCharCode(...u.subarray(i, i+0x8000));
+  return btoa(b).match(/.{1,76}/g).join('\r\n');
+}
+
+function exportEmail() {
+  if (!state.raw.length || typeof XLSX === 'undefined') return;
+  const wb  = buildWorkbook();
+  const buf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
+  const fname = `validation_report_${stamp()}.xlsx`;
+  const b64data = b64(buf);
+  const sv = computeStats(state.filtered);
+  const bnd = `----=_B${Date.now()}`;
+  const to  = norm($('emailTo').value);
+  const cc  = norm($('emailCc').value);
+  const subj= norm($('emailSubject').value) || `Final Validation Report — ${state.fileMeta?.name || ''}`;
+  const body = [
+    'Hello,','','Please find the validation report attached.','',
+    'Summary (current filter view):',
+    `  Tickets: ${sv.total}`,
+    `  Matched: ${sv.matched}`,
+    `  Corrected: ${sv.corrected}`,
+    `  Open Errors: ${sv.errors}`,
+    `  Exceptions: ${sv.exceptions}`,
+    `  Completion: ${sv.completion}%`,
+    '',`Attachment: ${fname}`,'','Regards.',
+  ].join('\r\n');
+
+  const lines = [
+    `To: ${to}`, cc ? `Cc: ${cc}` : null, `Subject: ${subj}`,
+    'MIME-Version: 1.0', `Content-Type: multipart/mixed; boundary="${bnd}"`, '',
+    `--${bnd}`, 'Content-Type: text/plain; charset="utf-8"', 'Content-Transfer-Encoding: 8bit', '', body, '',
+    `--${bnd}`,
+    `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="${fname}"`,
+    `Content-Disposition: attachment; filename="${fname}"`,
+    'Content-Transfer-Encoding: base64', '', b64data, '',
+    `--${bnd}--`, '',
+  ].filter(l => l !== null).join('\r\n');
+
+  download(new Blob([lines], { type:'message/rfc822' }), `validation_email_${stamp()}.eml`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EVENT BINDING
+// ═══════════════════════════════════════════════════════════════
+function bindAll() {
+  if (typeof XLSX === 'undefined') showBanner('Excel library failed to load. Check network, then refresh.');
+
+  // Dropzone
+  const dz = $('dropzone'), fi = $('fileInput');
+  dz.addEventListener('click', () => fi.click());
+  fi.addEventListener('change', ev => { const f = ev.target.files?.[0]; if (f) handleWorkbook(f); });
+  dz.addEventListener('dragover', ev => { ev.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+  dz.addEventListener('drop', ev => {
+    ev.preventDefault(); dz.classList.remove('drag');
+    const f = ev.dataTransfer.files?.[0]; if (f) handleWorkbook(f);
+  });
+
+  // Buttons
+  $('applyBtn').addEventListener('click', applyFilters);
+  $('clearBtn').addEventListener('click', clearFilters);
+  $('exportXlsxBtn').addEventListener('click', exportXlsx);
+  $('exportEmailBtn').addEventListener('click', exportEmail);
+
+  // Filters — live update
+  ['searchInput','ticketTypeFilter','specificDateFilter','fromDateFilter','toDateFilter','statusFilter']
+    .forEach(id => {
+      $(id).addEventListener('input', applyFilters);
+      $(id).addEventListener('change', applyFilters);
+    });
+
+  // Email fields — persist on change
+  ['emailTo','emailCc','emailSubject'].forEach(id => $(id).addEventListener('change', persistState));
+
+  // Table delegation for "Correct" buttons
+  $('resultsBody').addEventListener('click', ev => {
+    const btn = ev.target.closest('[data-cid]');
+    if (btn) markCorrected(btn.getAttribute('data-cid'));
+  });
+}
+
+window.addEventListener('error', ev => {
+  showBanner(`Runtime error: ${ev.message || 'Unknown'}`);
+});
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bindAll);
+} else {
+  bindAll();
+}
+</script>
+</body>
+</html>
