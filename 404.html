@@ -4,655 +4,291 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Validation Report 0001 — Excel Auditor</title>
-  <meta name="description" content="Side-by-side IE vs Field Nation audit with mismatch detection, correction tracking, charts, and Excel export." />
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <meta name="description" content="IE vs Field Nation side-by-side audit. Upload Excel, review mismatches, track corrections, export." />
+
+  <!--
+    ═══════════════════════════════════════════════════════════════
+    GITHUB PAGES FIX: Both libraries loaded from CDN with a
+    fallback CDN. No relative paths. No build step needed.
+    ═══════════════════════════════════════════════════════════════
+  -->
+
+  <!-- SheetJS primary CDN -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"
+          onerror="window.__xlsxFail=true"></script>
+  <!-- SheetJS fallback -->
+  <script>
+    if (window.__xlsxFail || typeof XLSX === 'undefined') {
+      document.write('<scr'+'ipt src="https://unpkg.com/xlsx@0.20.3/dist/xlsx.full.min.js"><\/scr'+'ipt>');
+    }
+  </script>
+
+  <!-- Chart.js primary CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"
+          onerror="window.__chartFail=true"></script>
+  <!-- Chart.js fallback -->
+  <script>
+    if (window.__chartFail || typeof Chart === 'undefined') {
+      document.write('<scr'+'ipt src="https://unpkg.com/chart.js@4.4.2/dist/chart.umd.min.js"><\/scr'+'ipt>');
+    }
+  </script>
+
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
 
     :root {
-      --fn-primary: #f97316;
-      --fn-dark: #c2410c;
-      --fn-soft: #fff7ed;
-      --fn-border: #fed7aa;
-      --ie-primary: #3b82f6;
-      --ie-dark: #1d4ed8;
-      --ie-soft: #eff6ff;
-      --ie-border: #bfdbfe;
-      --ok: #22c55e;
-      --ok-soft: #dcfce7;
-      --ok-text: #15803d;
-      --err: #ef4444;
-      --err-soft: #fee2e2;
-      --err-text: #b91c1c;
-      --warn: #f59e0b;
-      --warn-soft: #fef3c7;
-      --warn-text: #92400e;
-      --corrected: #8b5cf6;
-      --corrected-soft: #ede9fe;
-      --corrected-text: #6d28d9;
-      --bg: #f8fafc;
-      --surface: #ffffff;
-      --surface2: #f1f5f9;
-      --text: #0f172a;
-      --text2: #475569;
-      --text3: #94a3b8;
-      --border: #e2e8f0;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-      --shadow: 0 4px 16px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04);
-      --shadow-lg: 0 10px 40px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
-      --radius: 16px;
-      --radius-sm: 10px;
-      --radius-xs: 6px;
+      --fn:#f97316; --fn-dark:#c2410c; --fn-soft:#fff7ed; --fn-border:#fed7aa;
+      --ie:#3b82f6; --ie-dark:#1d4ed8; --ie-soft:#eff6ff; --ie-border:#bfdbfe;
+      --ok:#22c55e; --ok-soft:#dcfce7; --ok-text:#15803d;
+      --err:#ef4444; --err-soft:#fee2e2; --err-text:#b91c1c;
+      --warn:#f59e0b; --warn-soft:#fef3c7; --warn-text:#92400e;
+      --cor:#8b5cf6; --cor-soft:#ede9fe; --cor-text:#6d28d9;
+      --bg:#f8fafc; --surface:#ffffff; --surface2:#f1f5f9;
+      --text:#0f172a; --text2:#475569; --text3:#94a3b8; --border:#e2e8f0;
+      --r:14px; --rsm:9px; --rxs:6px;
+      --sh:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+      --shm:0 4px 16px rgba(0,0,0,.08),0 1px 4px rgba(0,0,0,.04);
+      --shl:0 10px 40px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.06);
     }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Space Grotesk',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;}
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    /* DEBUG OVERLAY */
+    #dbg{position:fixed;inset:0;background:rgba(15,23,42,.93);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;}
+    #dbg.h{display:none;}
+    .dbox{background:#1e293b;border:1px solid #334155;border-radius:var(--r);padding:32px;max-width:560px;width:100%;}
+    .dbox h2{color:var(--fn);font-size:19px;margin-bottom:14px;}
+    .dbox p{color:#cbd5e1;font-size:13px;line-height:1.7;margin-bottom:10px;}
+    .dbox pre{background:#0f172a;color:#7dd3fc;padding:12px;border-radius:var(--rsm);font-size:11px;overflow:auto;max-height:200px;white-space:pre-wrap;margin-bottom:14px;}
+    .dcl{background:var(--fn);color:#fff;border:none;padding:9px 18px;border-radius:var(--rsm);font-weight:700;cursor:pointer;font-size:13px;}
 
-    body {
-      font-family: 'Space Grotesk', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      font-size: 14px;
-      line-height: 1.5;
-    }
+    /* BANNER */
+    #ban{padding:11px 20px;font-weight:600;font-size:13px;background:#fff1f2;border-bottom:1px solid #fecaca;color:#9f1239;display:none;}
+    #ban.s{display:block;}
+    #ban.w{background:#fffbeb;border-color:#fde68a;color:#92400e;}
 
-    /* ─── HEADER ─── */
-    .app-header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 0 24px;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: var(--shadow-sm);
-    }
-    .header-inner {
-      max-width: 1800px;
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 60px;
-      gap: 20px;
-    }
-    .header-logo {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      text-decoration: none;
-    }
-    .logo-icon {
-      width: 36px; height: 36px;
-      background: linear-gradient(135deg, var(--fn-primary), var(--ie-primary));
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
-    }
-    .logo-text { font-weight: 800; font-size: 16px; color: var(--text); }
-    .logo-sub { font-size: 11px; color: var(--text3); font-weight: 500; }
-    .header-badges { display: flex; gap: 8px; }
-    .hbadge {
-      padding: 5px 12px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 700;
-      display: flex; align-items: center; gap: 6px;
-    }
-    .hbadge-dot { width: 8px; height: 8px; border-radius: 50%; }
-    .hbadge.ie { background: var(--ie-soft); color: var(--ie-dark); border: 1px solid var(--ie-border); }
-    .hbadge.fn { background: var(--fn-soft); color: var(--fn-dark); border: 1px solid var(--fn-border); }
-    .hbadge-dot.ie { background: var(--ie-primary); }
-    .hbadge-dot.fn { background: var(--fn-primary); }
+    /* HEADER */
+    .hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;position:sticky;top:0;z-index:100;box-shadow:var(--sh);}
+    .hdi{max-width:1800px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:56px;gap:16px;}
+    .logo{display:flex;align-items:center;gap:10px;}
+    .lico{width:33px;height:33px;background:linear-gradient(135deg,var(--fn),var(--ie));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+    .ltxt{font-weight:800;font-size:15px;}
+    .lsub{font-size:11px;color:var(--text3);font-weight:500;}
+    .hbdgs{display:flex;gap:7px;flex-shrink:0;}
+    .hbdg{padding:4px 11px;border-radius:999px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px;}
+    .hbdg.ie{background:var(--ie-soft);color:var(--ie-dark);border:1px solid var(--ie-border);}
+    .hbdg.fn{background:var(--fn-soft);color:var(--fn-dark);border:1px solid var(--fn-border);}
+    .bdt{width:7px;height:7px;border-radius:50%;}
+    .bdt.ie{background:var(--ie);}
+    .bdt.fn{background:var(--fn);}
 
-    /* ─── RUNTIME BANNER ─── */
-    .runtime-banner {
-      background: var(--err-soft);
-      border: 1px solid #fecaca;
-      color: var(--err-text);
-      padding: 12px 24px;
-      font-weight: 600;
-      font-size: 13px;
-      display: none;
-    }
-    .runtime-banner.show { display: block; }
+    /* MAIN */
+    .main{max-width:1800px;margin:0 auto;padding:18px 24px 60px;}
 
-    /* ─── MAIN LAYOUT ─── */
-    .main {
-      max-width: 1800px;
-      margin: 0 auto;
-      padding: 20px 24px 48px;
-    }
+    /* DROPZONE */
+    .dz{border:2px dashed var(--border);border-radius:var(--r);background:linear-gradient(135deg,var(--ie-soft),var(--fn-soft));padding:38px 28px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:18px;display:block;}
+    .dz:hover,.dz.dr{border-color:var(--fn);transform:translateY(-2px);box-shadow:var(--shl);}
+    .dz input{display:none;}
+    .dzi{font-size:36px;margin-bottom:10px;}
+    .dzt{font-size:19px;font-weight:800;margin-bottom:6px;}
+    .dzs{color:var(--text2);font-size:13px;}
 
-    /* ─── DROPZONE ─── */
-    .dropzone-wrap { margin-bottom: 20px; }
-    .dropzone {
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      background: linear-gradient(135deg, var(--ie-soft) 0%, var(--fn-soft) 100%);
-      padding: 40px 32px;
-      text-align: center;
-      cursor: pointer;
-      transition: all .2s ease;
-      position: relative;
-      overflow: hidden;
-    }
-    .dropzone::before {
-      content: '';
-      position: absolute; inset: 0;
-      background: linear-gradient(135deg, var(--ie-primary) 0%, var(--fn-primary) 100%);
-      opacity: 0;
-      transition: opacity .2s ease;
-    }
-    .dropzone:hover, .dropzone.drag {
-      border-color: var(--fn-primary);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-lg);
-    }
-    .dropzone:hover::before, .dropzone.drag::before { opacity: 0.04; }
-    .dropzone input { display: none; }
-    .dz-icon { font-size: 40px; margin-bottom: 12px; position: relative; }
-    .dz-title {
-      font-size: 20px;
-      font-weight: 800;
-      color: var(--text);
-      margin-bottom: 8px;
-      position: relative;
-    }
-    .dz-sub { color: var(--text2); font-size: 13px; position: relative; }
+    /* STATS */
+    .sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;}
+    .sc{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);position:relative;overflow:hidden;}
+    .sc::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;}
+    .sc.st::after{background:var(--text3);}
+    .sc.sm::after{background:var(--ok);}
+    .sc.scr::after{background:var(--cor);}
+    .sc.se::after{background:var(--err);}
+    .sc.sx::after{background:var(--warn);}
+    .sc.sr::after{background:linear-gradient(90deg,var(--ie),var(--fn));}
+    .slb{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px;}
+    .svl{font-size:28px;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1;}
+    .sm .svl{color:var(--ok-text);} .scr .svl{color:var(--cor-text);} .se .svl{color:var(--err-text);} .sx .svl{color:var(--warn-text);}
+    .ssb{font-size:10px;color:var(--text3);margin-top:3px;}
 
-    /* ─── STATS DASHBOARD ─── */
-    .dashboard { margin-bottom: 20px; }
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px 18px;
-      box-shadow: var(--shadow-sm);
-      position: relative;
-      overflow: hidden;
-      transition: box-shadow .2s ease;
-    }
-    .stat-card:hover { box-shadow: var(--shadow); }
-    .stat-card::after {
-      content: '';
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 3px;
-    }
-    .stat-card.total::after { background: var(--text3); }
-    .stat-card.matched::after { background: var(--ok); }
-    .stat-card.corrected::after { background: var(--corrected); }
-    .stat-card.errors::after { background: var(--err); }
-    .stat-card.exceptions::after { background: var(--warn); }
-    .stat-card.rate::after { background: linear-gradient(90deg, var(--ie-primary), var(--fn-primary)); }
-    .stat-card .stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text3); margin-bottom: 8px; }
-    .stat-card .stat-value { font-size: 32px; font-weight: 800; color: var(--text); font-family: 'JetBrains Mono', monospace; line-height: 1; }
-    .stat-card.matched .stat-value { color: var(--ok-text); }
-    .stat-card.corrected .stat-value { color: var(--corrected-text); }
-    .stat-card.errors .stat-value { color: var(--err-text); }
-    .stat-card.exceptions .stat-value { color: var(--warn-text); }
-    .stat-card .stat-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+    /* PROGRESS */
+    .pw{margin-bottom:14px;}
+    .ph{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--text2);margin-bottom:5px;}
+    .pt{height:7px;background:var(--border);border-radius:999px;overflow:hidden;}
+    .pb{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--ie),var(--fn));transition:width .4s;}
 
-    /* ─── CHART SECTION ─── */
-    .charts-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
-      margin-bottom: 20px;
-    }
-    .chart-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      box-shadow: var(--shadow-sm);
-    }
-    .chart-title {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text2);
-      text-transform: uppercase;
-      letter-spacing: .05em;
-      margin-bottom: 16px;
-    }
-    .chart-container { position: relative; height: 220px; }
+    /* CHARTS */
+    .cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:18px;}
+    .cc{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;box-shadow:var(--sh);}
+    .ctit{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:14px;}
+    .cbx{position:relative;height:210px;}
 
-    /* ─── TOOLBAR PANEL ─── */
-    .toolbar-panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px 20px;
-      box-shadow: var(--shadow-sm);
-      margin-bottom: 16px;
-    }
-    .toolbar-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: flex-end;
-      margin-bottom: 12px;
-    }
-    .toolbar-row:last-child { margin-bottom: 0; }
-    .field-grp {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-    .field-grp label {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-      color: var(--text3);
-    }
-    .field-grp input, .field-grp select {
-      padding: 9px 12px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      font-family: inherit;
-      font-size: 13px;
-      color: var(--text);
-      background: var(--surface);
-      transition: border-color .15s ease;
-      outline: none;
-      min-width: 0;
-    }
-    .field-grp input:focus, .field-grp select:focus { border-color: var(--ie-primary); }
-    .search-grp { flex: 1; min-width: 220px; }
-    .scope-tag {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--text3);
-      padding: 9px 14px;
-      background: var(--surface2);
-      border-radius: var(--radius-sm);
-      white-space: nowrap;
-    }
+    /* TOOLBAR */
+    .tbp{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);margin-bottom:14px;}
+    .tr{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:10px;}
+    .tr:last-child{margin-bottom:0;}
+    .fg{display:flex;flex-direction:column;gap:4px;}
+    .fg label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);}
+    .fg input,.fg select{padding:8px 11px;border:1px solid var(--border);border-radius:var(--rsm);font-family:inherit;font-size:13px;color:var(--text);background:var(--surface);outline:none;transition:border-color .15s;}
+    .fg input:focus,.fg select:focus{border-color:var(--ie);}
+    .fgs{flex:1;min-width:200px;}
+    .stag{font-size:11px;font-weight:700;color:var(--text3);padding:8px 13px;background:var(--surface2);border-radius:var(--rsm);white-space:nowrap;}
 
-    /* ─── BUTTONS ─── */
-    .btn {
-      padding: 9px 16px;
-      border: none;
-      border-radius: var(--radius-sm);
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all .15s ease;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      white-space: nowrap;
-    }
-    .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
-    .btn:active { transform: translateY(0); }
-    .btn:disabled { opacity: .6; cursor: default; transform: none !important; box-shadow: none !important; }
-    .btn-dark { background: var(--text); color: #fff; }
-    .btn-blue { background: var(--ie-primary); color: #fff; }
-    .btn-orange { background: var(--fn-primary); color: #fff; }
-    .btn-green { background: var(--ok); color: #fff; }
-    .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-    .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: var(--radius-xs); }
+    /* BUTTONS */
+    .btn{padding:8px 15px;border:none;border-radius:var(--rsm);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+    .btn:hover{transform:translateY(-1px);box-shadow:var(--shm);}
+    .btn:disabled{opacity:.5;cursor:default;transform:none!important;box-shadow:none!important;}
+    .bd{background:var(--text);color:#fff;}
+    .bb{background:var(--ie);color:#fff;}
+    .bo{background:var(--fn);color:#fff;}
+    .bg{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
 
-    /* Email section */
-    .email-section {
-      border-top: 1px solid var(--border);
-      margin-top: 12px;
-      padding-top: 12px;
-    }
-    .email-label {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-      color: var(--text3);
-      margin-bottom: 8px;
-    }
+    .eml-sec{border-top:1px solid var(--border);margin-top:10px;padding-top:10px;}
+    .eml-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:7px;}
+    .fn-note{font-size:11px;color:var(--text3);margin-top:7px;line-height:1.6;}
 
-    /* ─── TABLE PANEL ─── */
-    .table-panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow-sm);
-      overflow: hidden;
-    }
-    .table-wrap {
-      overflow: auto;
-      max-height: 70vh;
-    }
-    table {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
-      font-size: 12.5px;
-    }
-    thead th {
-      position: sticky;
-      background: #0f172a;
-      color: rgba(255,255,255,.85);
-      padding: 9px 11px;
-      text-align: left;
-      white-space: nowrap;
-      font-weight: 600;
-      font-size: 11px;
-      letter-spacing: .03em;
-      border-right: 1px solid rgba(255,255,255,.05);
-    }
-    thead tr.group-row th {
-      top: 0;
-      z-index: 4;
-      text-align: center;
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      padding: 8px 11px;
-      border-bottom: 1px solid rgba(255,255,255,.08);
-    }
-    thead tr.col-row th {
-      top: 36px;
-      z-index: 3;
-    }
-    .g-core { background: #1e293b !important; }
-    .g-ie { background: #1d4ed8 !important; }
-    .g-fn { background: #c2410c !important; }
-    .g-val { background: #0f766e !important; }
+    /* TABLE */
+    .tp{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;}
+    .tw{overflow:auto;max-height:70vh;}
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;}
+    thead th{background:#0f172a;color:rgba(255,255,255,.8);padding:8px 10px;text-align:left;white-space:nowrap;font-weight:600;font-size:10.5px;letter-spacing:.03em;border-right:1px solid rgba(255,255,255,.05);}
+    thead tr.gr th{position:sticky;top:0;z-index:4;text-align:center;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.08);}
+    thead tr.cr th{position:sticky;top:33px;z-index:3;}
+    .gc{background:#1e293b!important;} .gi{background:#1d4ed8!important;} .gf{background:#c2410c!important;} .gv{background:#0f766e!important;}
+    tbody td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;}
+    tbody tr:last-child td{border-bottom:none;}
+    tbody tr.rm{background:#f0fdf4;} tbody tr.re{background:#fff5f5;} tbody tr.rx{background:#fffbeb;} tbody tr.rc{background:#faf5ff;}
+    tbody tr:hover{filter:brightness(.97);}
+    td.mm{background:rgba(239,68,68,.13)!important;color:var(--err-text);font-weight:600;}
 
-    tbody td {
-      padding: 9px 11px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: middle;
-      white-space: nowrap;
-      font-size: 12.5px;
-    }
-    tbody tr:last-child td { border-bottom: none; }
-    tbody tr { transition: background .1s ease; }
-    tbody tr:hover { filter: brightness(.97); }
-    tbody tr.row-matched { background: #f0fdf4; }
-    tbody tr.row-error { background: #fff5f5; }
-    tbody tr.row-exception { background: #fffbeb; }
-    tbody tr.row-corrected { background: #faf5ff; }
+    /* PILLS */
+    .pill{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+    .pill.ok{background:var(--ok-soft);color:var(--ok-text);} .pill.er{background:var(--err-soft);color:var(--err-text);}
+    .pill.wn{background:var(--warn-soft);color:var(--warn-text);} .pill.co{background:var(--cor-soft);color:var(--cor-text);}
+    .pdot{width:5px;height:5px;border-radius:50%;background:currentColor;}
 
-    /* Cell highlighting for mismatches */
-    td.mismatch { background: rgba(239,68,68,.12) !important; color: var(--err-text); font-weight: 600; }
-    td.matched-cell { background: rgba(34,197,94,.07) !important; }
+    .abtn{padding:4px 11px;border:none;border-radius:var(--rxs);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;min-width:84px;}
+    .abtn.mk{background:var(--text);color:#fff;} .abtn.mk:hover{background:#334155;}
+    .abtn.dn{background:var(--cor-soft);color:var(--cor-text);cursor:default;}
 
-    /* ─── PILLS ─── */
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 9px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-    .pill.ok { background: var(--ok-soft); color: var(--ok-text); }
-    .pill.err { background: var(--err-soft); color: var(--err-text); }
-    .pill.warn { background: var(--warn-soft); color: var(--warn-text); }
-    .pill.corrected { background: var(--corrected-soft); color: var(--corrected-text); }
-    .pill.matched { background: var(--ok-soft); color: var(--ok-text); }
-    .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .dcl2,.ncl{max-width:240px;white-space:normal;line-height:1.4;font-size:11px;color:var(--text2);}
+    .emp{text-align:center;padding:48px;color:var(--text3);font-weight:600;}
+    .mn{font-family:'JetBrains Mono',monospace;font-size:11px;}
+    .h{display:none!important;}
 
-    /* ─── ACTION BUTTONS ─── */
-    .action-btn {
-      padding: 5px 12px;
-      border: none;
-      border-radius: var(--radius-xs);
-      font-family: inherit;
-      font-size: 11px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all .15s ease;
-      min-width: 88px;
-    }
-    .action-btn.mark { background: var(--text); color: #fff; }
-    .action-btn.mark:hover { background: #374151; }
-    .action-btn.done { background: var(--corrected-soft); color: var(--corrected-text); cursor: default; }
-
-    .empty-state {
-      text-align: center;
-      padding: 48px 24px;
-      color: var(--text3);
-      font-weight: 600;
-      font-size: 14px;
-    }
-
-    .details-cell, .note-cell {
-      max-width: 260px;
-      white-space: normal;
-      line-height: 1.45;
-      font-size: 11px;
-      color: var(--text2);
-    }
-
-    /* ─── HIDDEN ─── */
-    .hidden { display: none !important; }
-
-    /* ─── PROGRESS BAR ─── */
-    .progress-wrap { margin-bottom: 12px; }
-    .progress-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); font-weight: 600; margin-bottom: 6px; }
-    .progress-track {
-      height: 8px;
-      background: var(--border);
-      border-radius: 999px;
-      overflow: hidden;
-    }
-    .progress-bar {
-      height: 100%;
-      border-radius: 999px;
-      background: linear-gradient(90deg, var(--ie-primary), var(--fn-primary));
-      transition: width .4s ease;
-    }
-
-    /* ─── FILTER BAR NOTE ─── */
-    .filter-note {
-      font-size: 11px;
-      color: var(--text3);
-      margin-top: 8px;
-      line-height: 1.6;
-    }
-
-    /* ─── RESPONSIVE ─── */
-    @media (max-width: 1200px) {
-      .toolbar-row { flex-direction: column; align-items: stretch; }
-      .charts-grid { grid-template-columns: 1fr 1fr; }
-    }
-    @media (max-width: 720px) {
-      .main { padding: 12px 12px 40px; }
-      .header-inner { height: auto; padding: 12px 0; flex-wrap: wrap; }
-      .charts-grid { grid-template-columns: 1fr; }
-      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    @media(max-width:1100px){.cgrid{grid-template-columns:1fr 1fr;}}
+    @media(max-width:720px){
+      .main{padding:10px 10px 50px;} .cgrid{grid-template-columns:1fr;}
+      .sgrid{grid-template-columns:repeat(2,1fr);} .tr{flex-direction:column;}
     }
   </style>
 </head>
 <body>
 
+<!-- DEBUG OVERLAY -->
+<div id="dbg" class="h">
+  <div class="dbox">
+    <h2>⚠ Production Error Detected</h2>
+    <p id="dbgMsg">An error occurred while processing the file.</p>
+    <pre id="dbgStack"></pre>
+    <p style="font-size:12px;color:#94a3b8">
+      Recommended: use <strong>Chrome or Edge</strong>. Disable ad-blockers temporarily.
+      Ensure the file is a valid <strong>.xlsx</strong> with a <strong>Report</strong> sheet
+      and <strong>Assigned Company = "Field Nation"</strong>.
+    </p>
+    <button class="dcl" onclick="document.getElementById('dbg').classList.add('h')">✕ Dismiss &amp; Try Again</button>
+  </div>
+</div>
+
+<!-- RUNTIME BANNER -->
+<div id="ban"></div>
+
 <!-- HEADER -->
-<header class="app-header">
-  <div class="header-inner">
-    <div class="header-logo">
-      <div class="logo-icon">📊</div>
-      <div>
-        <div class="logo-text">Validation Report 0001</div>
-        <div class="logo-sub">Excel Auditor — IE vs Field Nation</div>
-      </div>
+<header class="hdr">
+  <div class="hdi">
+    <div class="logo">
+      <div class="lico">📊</div>
+      <div><div class="ltxt">Validation Report 0001</div><div class="lsub">Excel Auditor — IE vs Field Nation</div></div>
     </div>
-    <div class="header-badges">
-      <span class="hbadge ie"><span class="hbadge-dot ie"></span>IE = Blue</span>
-      <span class="hbadge fn"><span class="hbadge-dot fn"></span>Field Nation = Orange</span>
+    <div class="hbdgs">
+      <span class="hbdg ie"><span class="bdt ie"></span>IE = Blue</span>
+      <span class="hbdg fn"><span class="bdt fn"></span>Field Nation = Orange</span>
     </div>
   </div>
 </header>
-
-<!-- RUNTIME BANNER -->
-<div id="runtimeBanner" class="runtime-banner"></div>
 
 <!-- MAIN -->
 <main class="main">
 
   <!-- DROPZONE -->
-  <div class="dropzone-wrap">
-    <label class="dropzone" id="dropzone">
-      <input type="file" id="fileInput" accept=".xlsx,.xls" />
-      <div class="dz-icon">📂</div>
-      <div class="dz-title">Drag & drop your Excel workbook here</div>
-      <div class="dz-sub">Or click to browse &nbsp;·&nbsp; Expects a <strong>Report</strong> sheet with Field Nation and IE data side by side</div>
-    </label>
+  <label class="dz" id="dropzone">
+    <input type="file" id="fileInput" accept=".xlsx,.xls" />
+    <div class="dzi">📂</div>
+    <div class="dzt">Drag &amp; drop your Excel workbook here</div>
+    <div class="dzs">Or click to browse &nbsp;·&nbsp; Expects a <strong>Report</strong> sheet · Field Nation rows only</div>
+  </label>
+
+  <!-- DASHBOARD -->
+  <div id="dash" class="h">
+    <div class="sgrid" id="sgrid"></div>
+    <div class="pw"><div class="ph"><span>Completion</span><span id="plbl">0%</span></div><div class="pt"><div class="pb" id="pbar" style="width:0%"></div></div></div>
+    <div class="cgrid">
+      <div class="cc"><div class="ctit">Validation Results</div><div class="cbx"><canvas id="cPie"></canvas></div></div>
+      <div class="cc"><div class="ctit">Error Breakdown</div><div class="cbx"><canvas id="cBar"></canvas></div></div>
+      <div class="cc"><div class="ctit">Ticket Type Distribution</div><div class="cbx"><canvas id="cType"></canvas></div></div>
+    </div>
   </div>
 
-  <!-- DASHBOARD (hidden until data loaded) -->
-  <div class="dashboard hidden" id="dashboard">
-
-    <!-- STATS -->
-    <div class="stats-grid" id="statsGrid"></div>
-
-    <!-- PROGRESS BAR -->
-    <div class="progress-wrap" id="progressWrap">
-      <div class="progress-label">
-        <span>Completion Rate</span>
-        <span id="progressLabel">0%</span>
-      </div>
-      <div class="progress-track">
-        <div class="progress-bar" id="progressBar" style="width:0%"></div>
-      </div>
-    </div>
-
-    <!-- CHARTS -->
-    <div class="charts-grid" id="chartsGrid">
-      <div class="chart-card">
-        <div class="chart-title">Validation Results</div>
-        <div class="chart-container"><canvas id="chartPie"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Error Breakdown</div>
-        <div class="chart-container"><canvas id="chartBar"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-title">Ticket Type Distribution</div>
-        <div class="chart-container"><canvas id="chartType"></canvas></div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- TOOLBAR (hidden until data loaded) -->
-  <div class="toolbar-panel hidden" id="toolbarPanel">
-
-    <!-- Row 1: Search + Ticket Type + Status + Scope -->
-    <div class="toolbar-row">
-      <div class="field-grp search-grp">
-        <label>Search</label>
-        <input type="text" id="searchInput" placeholder="Ticket number, name…" />
-      </div>
-      <div class="field-grp">
-        <label>Ticket Type</label>
-        <select id="ticketTypeFilter"><option value="all">All Types</option></select>
-      </div>
-      <div class="field-grp">
-        <label>Status Filter</label>
-        <select id="statusFilter">
-          <option value="all">All Rows</option>
-          <option value="errors">Errors Only</option>
-          <option value="corrected">Corrected Only</option>
-          <option value="matched">Matched Only</option>
+  <!-- TOOLBAR -->
+  <div id="tbp" class="tbp h">
+    <div class="tr">
+      <div class="fg fgs"><label>Search</label><input type="text" id="srch" placeholder="Ticket, name…" /></div>
+      <div class="fg"><label>Ticket Type</label><select id="typeF"><option value="all">All Types</option></select></div>
+      <div class="fg"><label>Status</label>
+        <select id="statF">
+          <option value="all">All Rows</option><option value="errors">Errors Only</option>
+          <option value="corrected">Corrected Only</option><option value="matched">Matched Only</option>
           <option value="exception">Exception Matches</option>
         </select>
       </div>
-      <div class="field-grp">
-        <label>Specific Date</label>
-        <input type="date" id="specificDateFilter" />
-      </div>
-      <div class="field-grp">
-        <label>From Date</label>
-        <input type="date" id="fromDateFilter" />
-      </div>
-      <div class="field-grp">
-        <label>To Date</label>
-        <input type="date" id="toDateFilter" />
-      </div>
-      <div class="scope-tag" id="scopeTag">0 of 0 tickets</div>
+      <div class="fg"><label>Specific Date</label><input type="date" id="specD" /></div>
+      <div class="fg"><label>From Date</label><input type="date" id="fromD" /></div>
+      <div class="fg"><label>To Date</label><input type="date" id="toD" /></div>
+      <div class="stag" id="stag">—</div>
     </div>
-
-    <!-- Row 2: Actions -->
-    <div class="toolbar-row">
-      <button class="btn btn-dark" id="applyBtn">🔍 Apply Filters</button>
-      <button class="btn btn-ghost" id="clearBtn">✕ Clear Filters</button>
-      <button class="btn btn-blue" id="exportXlsxBtn">⬇ Export XLSX</button>
-      <button class="btn btn-orange" id="exportEmailBtn">📧 Export Email (.eml)</button>
+    <div class="tr">
+      <button class="btn bd" id="applyBtn">🔍 Apply</button>
+      <button class="btn bg" id="clearBtn">✕ Clear</button>
+      <button class="btn bb" id="xlsxBtn">⬇ Export XLSX</button>
+      <button class="btn bo" id="emlBtn">📧 Export Email (.eml)</button>
     </div>
-
-    <!-- Email draft fields -->
-    <div class="email-section">
-      <div class="email-label">Outlook Email Draft</div>
-      <div class="toolbar-row" style="margin-bottom:0">
-        <div class="field-grp" style="flex:1">
-          <input type="text" id="emailTo" placeholder="To:" />
-        </div>
-        <div class="field-grp" style="flex:1">
-          <input type="text" id="emailCc" placeholder="CC:" />
-        </div>
-        <div class="field-grp" style="flex:2">
-          <input type="text" id="emailSubject" placeholder="Subject" />
-        </div>
+    <div class="eml-sec">
+      <div class="eml-lbl">Outlook Email Draft</div>
+      <div class="tr" style="margin-bottom:0">
+        <div class="fg" style="flex:1"><input type="text" id="eTo" placeholder="To:" /></div>
+        <div class="fg" style="flex:1"><input type="text" id="eCc" placeholder="CC:" /></div>
+        <div class="fg" style="flex:2"><input type="text" id="eSubj" placeholder="Subject" /></div>
       </div>
     </div>
-
-    <div class="filter-note">
-      📅 Date filter uses <strong>FN Scheduled Date</strong> first, then <strong>IE Due Date</strong> as fallback.
-      &nbsp;·&nbsp; ⚡ ITD tickets always pass date validation.
-    </div>
-
+    <div class="fn-note">📅 Date filter uses <strong>FN Scheduled Date</strong> first, then <strong>IE Due Date</strong> as fallback. &nbsp;·&nbsp; ⚡ ITD tickets always pass date validation.</div>
   </div>
 
-  <!-- TABLE PANEL (hidden until data loaded) -->
-  <div class="table-panel hidden" id="tablePanel">
-    <div class="table-wrap">
+  <!-- TABLE -->
+  <div id="tbl" class="tp h">
+    <div class="tw">
       <table>
         <thead>
-          <tr class="group-row">
-            <th class="g-core" colspan="5">Core</th>
-            <th class="g-ie" colspan="5">Internal Entity (IE) — Blue</th>
-            <th class="g-fn" colspan="4">Field Nation (FN) — Orange</th>
-            <th class="g-val" colspan="9">Validation &amp; Tracking</th>
+          <tr class="gr">
+            <th class="gc" colspan="5">Core</th>
+            <th class="gi" colspan="5">Internal Entity (IE)</th>
+            <th class="gf" colspan="4">Field Nation (FN)</th>
+            <th class="gv" colspan="9">Validation &amp; Tracking</th>
           </tr>
-          <tr class="col-row">
-            <th>Row#</th>
-            <th>Ticket</th>
-            <th>Type</th>
-            <th>Company</th>
-            <th>Filter Date</th>
-            <th>IE &amp; FN Status</th>
-            <th>IE FE Name</th>
-            <th>IE Due Date</th>
-            <th>IE Due Time</th>
-            <th>IE Scheduled</th>
-            <th>FN Status</th>
-            <th>FN FE Name</th>
-            <th>FN Sched. Date</th>
-            <th>FN Sched. Time</th>
-            <th>Status ✓</th>
-            <th>Date ✓</th>
-            <th>Time ✓</th>
-            <th>Name ✓</th>
-            <th>Exception</th>
-            <th>Result</th>
-            <th>Details</th>
-            <th>Note</th>
-            <th>Action</th>
+          <tr class="cr">
+            <th>Row#</th><th>Ticket</th><th>Type</th><th>Company</th><th>Filter Date</th>
+            <th>IE&amp;FN Status</th><th>IE FE Name</th><th>IE Due Date</th><th>IE Due Time</th><th>IE Scheduled</th>
+            <th>FN Status</th><th>FN FE Name</th><th>FN Sched. Date</th><th>FN Sched. Time</th>
+            <th>Status✓</th><th>Date✓</th><th>Time✓</th><th>Name✓</th><th>Exception</th><th>Result</th><th>Details</th><th>Note</th><th>Action</th>
           </tr>
         </thead>
-        <tbody id="resultsBody"></tbody>
+        <tbody id="tbody"></tbody>
       </table>
     </div>
   </div>
@@ -660,740 +296,457 @@
 </main>
 
 <script>
-// ═══════════════════════════════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════════════════════════════
-const state = {
-  raw: [],
-  filtered: [],
-  fileMeta: null,
-  charts: { pie: null, bar: null, type: null },
+'use strict';
+
+/* ═══ STATE ═══════════════════════════════════════════════════ */
+const S={raw:[],filtered:[],fileMeta:null,charts:{pie:null,bar:null,typ:null}};
+
+/* ═══ DOM ══════════════════════════════════════════════════════ */
+const $=id=>document.getElementById(id);
+const E={
+  ban:$('ban'),dbg:$('dbg'),dbgMsg:$('dbgMsg'),dbgStk:$('dbgStack'),
+  dz:$('dropzone'),fi:$('fileInput'),
+  dash:$('dash'),sg:$('sgrid'),pb:$('pbar'),pl:$('plbl'),
+  tb:$('tbp'),tbl:$('tbl'),tbody:$('tbody'),
+  srch:$('srch'),typeF:$('typeF'),statF:$('statF'),specD:$('specD'),fromD:$('fromD'),toD:$('toD'),
+  stag:$('stag'),eTo:$('eTo'),eCc:$('eCc'),eSubj:$('eSubj'),
 };
 
-// ═══════════════════════════════════════════════════════════════
-//  HELPERS
-// ═══════════════════════════════════════════════════════════════
-const $ = id => document.getElementById(id);
-
-function norm(v) { return (v ?? '').toString().trim().replace(/\s+/g, ' '); }
-function normUp(v) { return norm(v).toUpperCase(); }
-function esc(v) {
-  return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+/* ═══ BANNER / DEBUG ══════════════════════════════════════════ */
+function showBan(msg,type='err'){
+  E.ban.textContent=msg;
+  E.ban.className=type==='warn'?'s w':'s';
 }
-function pad2(n) { return String(n).padStart(2,'0'); }
-function ts() { return new Date().toLocaleString(); }
-
-function showBanner(msg) {
-  const b = $('runtimeBanner');
-  b.textContent = msg;
-  b.classList.add('show');
-}
-function hideBanner() {
-  const b = $('runtimeBanner');
-  b.textContent = '';
-  b.classList.remove('show');
+function hideBan(){E.ban.className='';}
+function showDbg(msg,stack){
+  E.dbgMsg.textContent=msg;
+  $('dbgStack').textContent=stack||'';
+  E.dbg.classList.remove('h');
 }
 
-// ─── DATE UTILITIES (Day-1-Offset safe) ───
-function fmtDate(y, m, d) { return `${y}-${pad2(m)}-${pad2(d)}`; }
-function fmtDateLocal(date) { return fmtDate(date.getFullYear(), date.getMonth()+1, date.getDate()); }
-function fmtDateUTC(date) { return fmtDate(date.getUTCFullYear(), date.getUTCMonth()+1, date.getUTCDate()); }
-
-function excelSerial(v) {
-  if (typeof v !== 'number' || !Number.isFinite(v)) return null;
-  const days = Math.floor(v);
-  const adj = days >= 60 ? days - 1 : days;
-  return new Date(Date.UTC(1899, 11, 31) + adj * 86400000);
+/* ═══ LIB CHECK ═══════════════════════════════════════════════ */
+function libsOk(){
+  const m=[];
+  if(typeof XLSX==='undefined') m.push('SheetJS (xlsx)');
+  if(typeof Chart==='undefined') m.push('Chart.js');
+  if(m.length){showBan(`Libraries failed to load: ${m.join(', ')}. Check internet connection and refresh.`);return false;}
+  return true;
 }
 
-function parseDatePart(v) {
-  if (v === null || v === undefined || v === '') return '';
-  if (v instanceof Date) return fmtDateLocal(v);
-  if (typeof v === 'number' && Number.isFinite(v)) {
-    const d = excelSerial(v);
-    return d ? fmtDateUTC(d) : '';
-  }
-  const t = norm(v);
-  if (!t) return '';
-  const iso = t.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
-  if (iso) return fmtDate(iso[1], iso[2], iso[3]);
-  const slash = t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
-  if (slash) {
-    let yr = slash[3]; if (yr.length === 2) yr = `20${yr}`;
-    const a = +slash[1], b = +slash[2];
-    return fmtDate(yr, a>12?b:a, a>12?a:b);
-  }
-  const word = t.match(/^([A-Za-z]{3,9})\s+(\d{1,2}),\s*(\d{4})$/);
-  if (word) { const d = new Date(t); return isNaN(d.getTime()) ? t : fmtDateLocal(d); }
+/* ═══ DATE UTILITIES ══════════════════════════════════════════
+   FIX: raw:true keeps dates as Excel serial numbers.
+   We decode them ourselves with UTC math → no timezone offset.
+   ════════════════════════════════════════════════════════════ */
+function p2(n){return String(n).padStart(2,'0');}
+function fd(y,m,d){return `${y}-${p2(m)}-${p2(d)}`;}
+function fdL(dt){return fd(dt.getFullYear(),dt.getMonth()+1,dt.getDate());}
+function fdU(dt){return fd(dt.getUTCFullYear(),dt.getUTCMonth()+1,dt.getUTCDate());}
+
+/*
+  Excel serial date → YYYY-MM-DD (UTC, no timezone shift)
+  Epoch: serial 1 = Jan 1 1900 in UTC
+  serial 60 = fake Feb 29 1900 (Excel bug) → we subtract 1 for serials ≥ 60
+*/
+function serial2date(v){
+  if(typeof v!=='number'||!Number.isFinite(v)||v<1) return '';
+  const adj=Math.floor(v)>=60?Math.floor(v)-1:Math.floor(v);
+  const ms=Date.UTC(1899,11,31)+adj*86400000;
+  return fdU(new Date(ms));
+}
+
+function parseDatePart(v){
+  if(v===null||v===undefined||v==='') return '';
+  if(typeof v==='number'&&Number.isFinite(v)) return serial2date(v);
+  if(v instanceof Date) return fdL(v);
+  const t=String(v).trim().replace(/\s+/g,' ');
+  if(!t) return '';
+  const iso=t.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if(iso) return fd(iso[1],iso[2],iso[3]);
+  const sl=t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if(sl){let y=sl[3];if(y.length===2)y='20'+y;const a=+sl[1],b=+sl[2];return fd(y,a>12?b:a,a>12?a:b);}
+  const wd=t.match(/^([A-Za-z]{3,9})\s+(\d{1,2}),?\s*(\d{4})$/);
+  if(wd){const dt=new Date(t);return isNaN(dt.getTime())?t:fdL(dt);}
   return t;
 }
 
-function parseTimePart(v) {
-  if (v === null || v === undefined || v === '') return '';
-  if (v instanceof Date) return `${pad2(v.getHours())}:${pad2(v.getMinutes())}`;
-  if (typeof v === 'string') {
-    const t = norm(v).toUpperCase();
-    const ampm = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
-    if (ampm) {
-      let h = +ampm[1]; const mn = ampm[2], s = ampm[3];
-      if (s === 'PM' && h < 12) h += 12;
-      if (s === 'AM' && h === 12) h = 0;
-      return `${pad2(h)}:${mn}`;
-    }
-    const m = t.match(/(\d{1,2}):(\d{2})/);
-    if (m) return `${pad2(+m[1])}:${m[2]}`;
-    return t;
+function parseTimePart(v){
+  if(v===null||v===undefined||v==='') return '';
+  if(v instanceof Date) return `${p2(v.getHours())}:${p2(v.getMinutes())}`;
+  if(typeof v==='number'&&Number.isFinite(v)){
+    const tot=Math.round((v%1)*24*60);
+    return `${p2(Math.floor(tot/60)%24)}:${p2(tot%60)}`;
   }
-  if (typeof v === 'number' && Number.isFinite(v)) {
-    const tot = Math.round(v * 24 * 60);
-    return `${pad2(Math.floor(tot/60)%24)}:${pad2(tot%60)}`;
+  if(typeof v==='string'){
+    const t=v.trim().toUpperCase();
+    const ap=t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+    if(ap){let h=+ap[1];const mn=ap[2],s=ap[3];if(s==='PM'&&h<12)h+=12;if(s==='AM'&&h===12)h=0;return `${p2(h)}:${mn}`;}
+    const pl=t.match(/(\d{1,2}):(\d{2})/);
+    if(pl) return `${p2(+pl[1])}:${pl[2]}`;
   }
-  return norm(v);
+  return String(v).trim();
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  VALIDATION LOGIC
-// ═══════════════════════════════════════════════════════════════
-function defaultTracking() { return { correctedMarked: false, correctedAt: '' }; }
+/* ═══ VALIDATION LOGIC ════════════════════════════════════════ */
+function norm(v){return(v??'').toString().trim().replace(/\s+/g,' ');}
+function normU(v){return norm(v).toUpperCase();}
+function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function defTrk(){return{correctedMarked:false,correctedAt:''};}
+function nowStr(){return new Date().toLocaleString();}
 
-function recomputeRow(row) {
-  const statusOk = normUp(row.ieFnStatus) === 'OK';
-  const hasDate = !!(row.ieDueDate && row.fnScheduledDate);
-  const hasTime = !!(row.ieDueTime && row.fnScheduledTime);
-  const hasName = !!(row.ieFeName || row.fnFeName);
-
-  const rawDateMatch = !hasDate ? true : row.ieDueDate === row.fnScheduledDate;
-  const rawTimeMatch = !hasTime ? true : row.ieDueTime === row.fnScheduledTime;
-
-  const dateExc = !rawDateMatch && row.ticketType === 'ITD';
-  const timeExc = !rawTimeMatch && (row.ticketType === 'ITD' || row.ticketType === 'ITR');
-
-  const dateValid = !hasDate ? true : (rawDateMatch || dateExc);
-  const timeValid = !hasTime ? true : (rawTimeMatch || timeExc);
-  const nameValid = !hasName ? true : normUp(row.ieFeName) === normUp(row.fnFeName);
-
-  row.statusOk = statusOk;
-  row.dateValid = dateValid;
-  row.timeValid = timeValid;
-  row.nameValid = nameValid;
-  row.dateException = dateExc;
-  row.timeException = timeExc;
-  row.exceptionApplied = dateExc || timeExc;
-  row.exceptionType = [dateExc ? 'ITD-Date' : '', timeExc ? `${row.ticketType}-Time` : ''].filter(Boolean).join(', ');
-
-  const errs = [
-    !statusOk ? 'Status ≠ OK' : '',
-    !dateValid ? 'Due Date ≠ FN Date' : '',
-    !timeValid ? 'Due Time ≠ FN Time' : '',
-    !nameValid ? 'IE Name ≠ FN Name' : '',
-  ].filter(Boolean);
-
-  row.validationResult = errs.length ? 'Error' : 'Matched';
-  row.baseIssueDetails = errs.length
-    ? errs.join('; ')
-    : (row.exceptionApplied ? `Matched via ${row.exceptionType}` : 'All checks passed');
-
-  if (row.validationResult === 'Error' && row.tracking.correctedMarked) {
-    row.finalResult = 'Corrected';
-    row.issueDetails = `${row.baseIssueDetails}; Corrected by user`;
-    row.trackingNote = `Corrected on ${row.tracking.correctedAt}`;
+function recomp(row){
+  const sOk=normU(row.ieFnStatus)==='OK';
+  const hD=!!(row.ieDueDate&&row.fnSD);
+  const hT=!!(row.ieDueTime&&row.fnST);
+  const hN=!!(row.ieFEN||row.fnFEN);
+  const rdOk=!hD?true:row.ieDueDate===row.fnSD;
+  const rtOk=!hT?true:row.ieDueTime===row.fnST;
+  const dExc=!rdOk&&row.type==='ITD';
+  const tExc=!rtOk&&(row.type==='ITD'||row.type==='ITR');
+  const dVal=!hD?true:(rdOk||dExc);
+  const tVal=!hT?true:(rtOk||tExc);
+  const nVal=!hN?true:normU(row.ieFEN)===normU(row.fnFEN);
+  row.sOk=sOk;row.dVal=dVal;row.tVal=tVal;row.nVal=nVal;
+  row.dExc=dExc;row.tExc=tExc;
+  row.excA=dExc||tExc;
+  row.excT=[dExc?'ITD-Date':'',tExc?`${row.type}-Time`:''].filter(Boolean).join(', ');
+  const errs=[!sOk?'Status≠OK':'',!dVal?'DueDate≠FNDate':'',!tVal?'DueTime≠FNTime':'',!nVal?'IEName≠FNName':''].filter(Boolean);
+  row.vRes=errs.length?'Error':'Matched';
+  row.bDet=errs.length?errs.join('; '):(row.excA?`Matched via ${row.excT}`:'All checks passed');
+  if(row.vRes==='Error'&&row.trk.correctedMarked){
+    row.fRes='Corrected';row.det=`${row.bDet}; Corrected by user`;row.note=`Corrected on ${row.trk.correctedAt}`;
   } else {
-    row.finalResult = row.validationResult;
-    row.issueDetails = row.baseIssueDetails;
-    row.trackingNote = row.tracking.correctedMarked ? `Corrected on ${row.tracking.correctedAt}` : 'Pending';
+    row.fRes=row.vRes;row.det=row.bDet;row.note=row.trk.correctedMarked?`Corrected on ${row.trk.correctedAt}`:'Pending';
   }
-  if (row.exceptionApplied && !row.issueDetails.includes(row.exceptionType)) {
-    row.issueDetails += `; ${row.exceptionType}`;
-  }
+  if(row.excA&&!row.det.includes(row.excT)) row.det+=`; ${row.excT}`;
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  PARSE WORKBOOK
-// ═══════════════════════════════════════════════════════════════
-function parseReportSheet(rows) {
-  const out = [];
-  for (let i = 2; i < rows.length; i++) {
-    const r = rows[i] || [];
-    const ticket = r[0]; if (!ticket) continue;
-    const company = normUp(r[12]);
-    if (company !== 'FIELD NATION') continue;
-    const fnSched = parseDatePart(r[20]);
-    const ieDue   = parseDatePart(r[7]);
-    const row = {
-      rowId: `r${i}`,
-      sourceRowNumber: i + 1,
-      ticket,
-      ticketType: normUp(r[5]),
-      assignedCompany: norm(r[12]),
-      ieFnStatus: norm(r[26]),
-      ieFeName: norm(r[13]),
-      fnFeName: norm(r[23]),
-      ieDueDate: ieDue,
-      ieDueTime: parseTimePart(r[8]),
-      ieScheduledDate: parseDatePart(r[9]),
-      ieScheduledTime: parseTimePart(r[10]),
-      fnScheduledDate: fnSched,
-      fnScheduledTime: parseTimePart(r[21]),
-      fnStatus: norm(r[16]),
-      filterDate: fnSched || ieDue || '',
-      tracking: defaultTracking(),
+/* ═══ PARSE WORKBOOK ══════════════════════════════════════════
+   KEY FIX: raw:true → numeric cells stay as numbers.
+   We parse them manually. This prevents timezone-induced date shifts.
+   ════════════════════════════════════════════════════════════ */
+function parseSheet(rows){
+  const out=[];
+  for(let i=2;i<rows.length;i++){
+    const r=rows[i]||[];
+    const ticket=r[0];if(!ticket) continue;
+    if(normU(r[12])!=='FIELD NATION') continue;
+    const fnD=parseDatePart(r[20]),ieD=parseDatePart(r[7]);
+    const row={
+      rowId:`r${i}`,srcRow:i+1,ticket,type:normU(r[5]),company:norm(r[12]),
+      ieFnStatus:norm(r[26]),ieFEN:norm(r[13]),fnFEN:norm(r[23]),
+      ieDueDate:ieD,ieDueTime:parseTimePart(r[8]),
+      ieSD:parseDatePart(r[9]),ieST:parseTimePart(r[10]),
+      fnSD:fnD,fnST:parseTimePart(r[21]),fnStatus:norm(r[16]),
+      filterDate:fnD||ieD||'',trk:defTrk(),
     };
-    recomputeRow(row);
-    out.push(row);
+    recomp(row);out.push(row);
   }
   return out;
 }
 
-function handleWorkbook(file) {
-  if (typeof XLSX === 'undefined') { showBanner('Excel library failed to load. Refresh and try again.'); return; }
-  hideBanner();
-  state.fileMeta = { name: file.name, size: file.size, lastModified: file.lastModified };
-  const reader = new FileReader();
-  reader.onload = ev => {
-    try {
-      const wb = XLSX.read(new Uint8Array(ev.target.result), { type:'array', cellDates:false });
-      const sn = wb.SheetNames.includes('Report') ? 'Report' : wb.SheetNames[0];
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header:1, raw:false, defval:'', dateNF:'yyyy-mm-dd' });
-      state.raw = parseReportSheet(rows);
-      if (!state.raw.length) {
-        showBanner('No Field Nation rows found. Confirm the workbook contains a "Report" sheet and Assigned Company = "Field Nation".');
+function handleWB(file){
+  if(!libsOk()) return;
+  hideBan();
+  S.fileMeta={name:file.name,size:file.size,lastModified:file.lastModified};
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    try{
+      if(typeof XLSX==='undefined') throw new Error('SheetJS not available');
+      const wb=XLSX.read(new Uint8Array(ev.target.result),{
+        type:'array',
+        cellDates:false,  // CRITICAL: keep as serial numbers
+        cellNF:false,
+        cellText:false,
+      });
+      const sn=wb.SheetNames.includes('Report')?'Report':wb.SheetNames[0];
+      if(!sn) throw new Error('No sheets found in workbook');
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{
+        header:1,
+        raw:true,         // CRITICAL: raw numbers, not formatted strings
+        defval:'',
+      });
+      if(!rows||rows.length<3) throw new Error('Sheet is empty or has fewer than 3 rows');
+      S.raw=parseSheet(rows);
+      if(!S.raw.length){
+        showBan('No Field Nation rows found. Verify: sheet name is "Report", Assigned Company column = "Field Nation".');
         return;
       }
-      populateTicketTypes();
-      loadPersistedState();
-      if (!norm($('emailSubject').value)) {
-        $('emailSubject').value = `Final Validation Report — ${file.name.replace(/\.[^.]+$/,'')}`;
-      }
-      ['dashboard','toolbarPanel','tablePanel'].forEach(id => $(id).classList.remove('hidden'));
+      popTypes();loadState();
+      if(!norm(E.eSubj.value)) E.eSubj.value=`Final Validation Report — ${file.name.replace(/\.[^.]+$/,'')}`;
+      ['dash','tbp','tbl'].forEach(id=>$(id).classList.remove('h'));
       applyFilters();
-    } catch (err) {
-      showBanner(`Failed to load workbook: ${err.message || err}`);
+    } catch(err){
+      console.error('[VRA]',err);
+      showBan(`File processing failed: ${err.message}`);
+      showDbg(`Failed to process "${file.name}": ${err.message}`,err.stack||String(err));
     }
   };
-  reader.onerror = () => showBanner('File could not be read. Try again.');
-  reader.readAsArrayBuffer(file);
+  rd.onerror=()=>{showBan('File could not be read. Try another browser or file.');showDbg('FileReader.onerror','');};
+  rd.readAsArrayBuffer(file);
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  FILTERS
-// ═══════════════════════════════════════════════════════════════
-function populateTicketTypes() {
-  const cur = $('ticketTypeFilter').value || 'all';
-  const types = [...new Set(state.raw.map(r => r.ticketType).filter(Boolean))].sort();
-  $('ticketTypeFilter').innerHTML = '<option value="all">All Types</option>' +
-    types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
-  $('ticketTypeFilter').value = types.includes(cur) ? cur : 'all';
+/* ═══ FILTERS ═════════════════════════════════════════════════ */
+function popTypes(){
+  const cur=E.typeF.value||'all';
+  const ts=[...new Set(S.raw.map(r=>r.type).filter(Boolean))].sort();
+  E.typeF.innerHTML='<option value="all">All Types</option>'+ts.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  E.typeF.value=ts.includes(cur)?cur:'all';
 }
-
-function applyFilters() {
-  const search = norm($('searchInput').value).toLowerCase();
-  const type   = $('ticketTypeFilter').value;
-  const specific = $('specificDateFilter').value;
-  const from   = $('fromDateFilter').value;
-  const to     = $('toDateFilter').value;
-  const status = $('statusFilter').value;
-
-  state.filtered = state.raw.filter(r => {
-    if (search && !`${r.ticket} ${r.ieFeName} ${r.fnFeName}`.toLowerCase().includes(search)) return false;
-    if (type !== 'all' && r.ticketType !== type) return false;
-    const d = r.filterDate || '';
-    if (specific && d !== specific) return false;
-    if (from && d && d < from) return false;
-    if (to && d && d > to) return false;
-    if (status === 'errors' && r.finalResult !== 'Error') return false;
-    if (status === 'corrected' && r.finalResult !== 'Corrected') return false;
-    if (status === 'matched' && r.finalResult !== 'Matched') return false;
-    if (status === 'exception' && !(r.exceptionApplied && r.finalResult === 'Matched')) return false;
+function applyFilters(){
+  const q=norm(E.srch.value).toLowerCase(),type=E.typeF.value,sp=E.specD.value,fr=E.fromD.value,to=E.toD.value,st=E.statF.value;
+  S.filtered=S.raw.filter(r=>{
+    if(q&&!`${r.ticket} ${r.ieFEN} ${r.fnFEN}`.toLowerCase().includes(q)) return false;
+    if(type!=='all'&&r.type!==type) return false;
+    const d=r.filterDate||'';
+    if(sp&&d!==sp) return false;
+    if(fr&&d&&d<fr) return false;
+    if(to&&d&&d>to) return false;
+    if(st==='errors'&&r.fRes!=='Error') return false;
+    if(st==='corrected'&&r.fRes!=='Corrected') return false;
+    if(st==='matched'&&r.fRes!=='Matched') return false;
+    if(st==='exception'&&!(r.excA&&r.fRes==='Matched')) return false;
     return true;
   });
-
-  renderStats(state.filtered);
-  renderCharts(state.filtered);
-  renderTable(state.filtered);
-  $('scopeTag').textContent = `${state.filtered.length} of ${state.raw.length} tickets`;
-  persistState();
+  renderStats(S.filtered);renderCharts(S.filtered);renderTable(S.filtered);
+  E.stag.textContent=`${S.filtered.length} of ${S.raw.length} tickets`;
+  saveState();
+}
+function clearF(){
+  [E.srch,E.specD,E.fromD,E.toD].forEach(e=>{e.value='';});
+  E.typeF.value='all';E.statF.value='all';applyFilters();
 }
 
-function clearFilters() {
-  ['searchInput','specificDateFilter','fromDateFilter','toDateFilter'].forEach(id => $(id).value = '');
-  $('ticketTypeFilter').value = 'all';
-  $('statusFilter').value = 'all';
-  applyFilters();
+/* ═══ STATS ═══════════════════════════════════════════════════ */
+function calcStats(rows){
+  const n=rows.length,m=rows.filter(r=>r.fRes==='Matched').length,c=rows.filter(r=>r.fRes==='Corrected').length,
+        e=rows.filter(r=>r.fRes==='Error').length,x=rows.filter(r=>r.excA).length,
+        cp=n?(((m+c)/n)*100).toFixed(1):'0.0',
+        se=rows.filter(r=>!r.sOk).length,de=rows.filter(r=>!r.dVal).length,
+        te=rows.filter(r=>!r.tVal).length,ne=rows.filter(r=>!r.nVal).length;
+  return{n,m,c,e,x,cp,se,de,te,ne};
+}
+function renderStats(rows){
+  const s=calcStats(rows);
+  E.sg.innerHTML=`
+    <div class="sc st"><div class="slb">Tickets</div><div class="svl">${s.n}</div></div>
+    <div class="sc sm"><div class="slb">Matched</div><div class="svl">${s.m}</div></div>
+    <div class="sc scr"><div class="slb">Corrected</div><div class="svl">${s.c}</div></div>
+    <div class="sc se"><div class="slb">Open Errors</div><div class="svl">${s.e}</div></div>
+    <div class="sc sx"><div class="slb">Exceptions</div><div class="svl">${s.x}</div></div>
+    <div class="sc sr"><div class="slb">Completion</div><div class="svl">${s.cp}%</div><div class="ssb">matched+corrected</div></div>
+    <div class="sc"><div class="slb">Status Errs</div><div class="svl" style="font-size:22px;color:var(--err-text)">${s.se}</div></div>
+    <div class="sc"><div class="slb">Date Errs</div><div class="svl" style="font-size:22px;color:var(--err-text)">${s.de}</div></div>
+    <div class="sc"><div class="slb">Time Errs</div><div class="svl" style="font-size:22px;color:var(--err-text)">${s.te}</div></div>
+    <div class="sc"><div class="slb">Name Errs</div><div class="svl" style="font-size:22px;color:var(--err-text)">${s.ne}</div></div>`;
+  E.pb.style.width=`${parseFloat(s.cp)}%`;E.pl.textContent=`${s.cp}%`;
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  STATS
-// ═══════════════════════════════════════════════════════════════
-function computeStats(rows) {
-  const total = rows.length;
-  const matched   = rows.filter(r => r.finalResult === 'Matched').length;
-  const corrected = rows.filter(r => r.finalResult === 'Corrected').length;
-  const errors    = rows.filter(r => r.finalResult === 'Error').length;
-  const exceptions= rows.filter(r => r.exceptionApplied).length;
-  const completion= total ? (((matched + corrected) / total) * 100).toFixed(1) : '0.0';
-  const statusErr = rows.filter(r => !r.statusOk).length;
-  const dateErr   = rows.filter(r => !r.dateValid).length;
-  const timeErr   = rows.filter(r => !r.timeValid).length;
-  const nameErr   = rows.filter(r => !r.nameValid).length;
-  return { total, matched, corrected, errors, exceptions, completion, statusErr, dateErr, timeErr, nameErr };
+/* ═══ CHARTS ══════════════════════════════════════════════════ */
+const CC={m:'#22c55e',c:'#8b5cf6',e:'#ef4444',x:'#f59e0b',s:'#f97316',d:'#3b82f6',t:'#6366f1',n:'#ec4899'};
+const TC=['#3b82f6','#f97316','#8b5cf6','#22c55e','#f59e0b','#ec4899','#06b6d4','#84cc16'];
+function dstC(k){if(S.charts[k]){S.charts[k].destroy();S.charts[k]=null;}}
+function renderCharts(rows){
+  if(typeof Chart==='undefined') return;
+  const s=calcStats(rows);
+  dstC('pie');
+  S.charts.pie=new Chart($('cPie'),{type:'doughnut',
+    data:{labels:['Matched','Corrected','Errors','Exceptions'],
+      datasets:[{data:[s.m,s.c,s.e,s.x],backgroundColor:[CC.m,CC.c,CC.e,CC.x],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{family:'Space Grotesk',size:11},padding:10}}}}});
+  dstC('bar');
+  S.charts.bar=new Chart($('cBar'),{type:'bar',
+    data:{labels:['Status','Date','Time','Name'],
+      datasets:[{label:'Errors',data:[s.se,s.de,s.te,s.ne],backgroundColor:[CC.s,CC.d,CC.t,CC.n],borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:true,ticks:{font:{family:'Space Grotesk'}}},x:{ticks:{font:{family:'Space Grotesk'}}}}}});
+  dstC('typ');
+  const tc={};rows.forEach(r=>{const k=r.type||'Unknown';tc[k]=(tc[k]||0)+1;});
+  const tl=Object.keys(tc).sort();
+  S.charts.typ=new Chart($('cType'),{type:'bar',
+    data:{labels:tl,datasets:[{label:'Tickets',data:tl.map(t=>tc[t]),backgroundColor:tl.map((_,i)=>TC[i%TC.length]),borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:true,ticks:{font:{family:'Space Grotesk'}}},x:{ticks:{font:{family:'Space Grotesk',size:10}}}}}});
 }
 
-function renderStats(rows) {
-  const s = computeStats(rows);
-  $('statsGrid').innerHTML = `
-    <div class="stat-card total"><div class="stat-label">Tickets</div><div class="stat-value">${s.total}</div></div>
-    <div class="stat-card matched"><div class="stat-label">Matched</div><div class="stat-value">${s.matched}</div></div>
-    <div class="stat-card corrected"><div class="stat-label">Corrected</div><div class="stat-value">${s.corrected}</div></div>
-    <div class="stat-card errors"><div class="stat-label">Open Errors</div><div class="stat-value">${s.errors}</div></div>
-    <div class="stat-card exceptions"><div class="stat-label">Exceptions</div><div class="stat-value">${s.exceptions}</div></div>
-    <div class="stat-card rate"><div class="stat-label">Completion</div><div class="stat-value">${s.completion}%</div><div class="stat-sub">(matched + corrected)</div></div>
-    <div class="stat-card"><div class="stat-label">Status Errors</div><div class="stat-value" style="font-size:22px;color:var(--err-text)">${s.statusErr}</div></div>
-    <div class="stat-card"><div class="stat-label">Date Errors</div><div class="stat-value" style="font-size:22px;color:var(--err-text)">${s.dateErr}</div></div>
-    <div class="stat-card"><div class="stat-label">Time Errors</div><div class="stat-value" style="font-size:22px;color:var(--err-text)">${s.timeErr}</div></div>
-    <div class="stat-card"><div class="stat-label">Name Errors</div><div class="stat-value" style="font-size:22px;color:var(--err-text)">${s.nameErr}</div></div>
-  `;
-  const pct = parseFloat(s.completion);
-  $('progressBar').style.width = `${pct}%`;
-  $('progressLabel').textContent = `${s.completion}%`;
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  CHARTS
-// ═══════════════════════════════════════════════════════════════
-const CHART_COLORS = {
-  matched:   '#22c55e',
-  corrected: '#8b5cf6',
-  errors:    '#ef4444',
-  exception: '#f59e0b',
-  status:    '#f97316',
-  date:      '#3b82f6',
-  time:      '#6366f1',
-  name:      '#ec4899',
-};
-
-function destroyChart(key) {
-  if (state.charts[key]) { state.charts[key].destroy(); state.charts[key] = null; }
-}
-
-function renderCharts(rows) {
-  const s = computeStats(rows);
-
-  // PIE — validation results
-  destroyChart('pie');
-  state.charts.pie = new Chart($('chartPie'), {
-    type: 'doughnut',
-    data: {
-      labels: ['Matched','Corrected','Open Errors','Exceptions'],
-      datasets:[{
-        data: [s.matched, s.corrected, s.errors, s.exceptions],
-        backgroundColor: [CHART_COLORS.matched, CHART_COLORS.corrected, CHART_COLORS.errors, CHART_COLORS.exception],
-        borderWidth: 2, borderColor: '#fff',
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position:'right', labels:{ font:{ family:'Space Grotesk', size:11 }, padding:10 } } }
-    }
-  });
-
-  // BAR — error breakdown
-  destroyChart('bar');
-  state.charts.bar = new Chart($('chartBar'), {
-    type: 'bar',
-    data: {
-      labels: ['Status','Date','Time','Name'],
-      datasets:[{
-        label: 'Errors',
-        data: [s.statusErr, s.dateErr, s.timeErr, s.nameErr],
-        backgroundColor: [CHART_COLORS.status, CHART_COLORS.date, CHART_COLORS.time, CHART_COLORS.name],
-        borderRadius: 6,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend:{ display:false } },
-      scales: {
-        y: { beginAtZero:true, ticks:{ font:{ family:'Space Grotesk' } } },
-        x: { ticks:{ font:{ family:'Space Grotesk' } } }
-      }
-    }
-  });
-
-  // BAR — ticket type distribution
-  destroyChart('type');
-  const typeCounts = {};
-  rows.forEach(r => { typeCounts[r.ticketType || 'Unknown'] = (typeCounts[r.ticketType || 'Unknown'] || 0) + 1; });
-  const typeLabels = Object.keys(typeCounts).sort();
-  const typeColors = ['#3b82f6','#f97316','#8b5cf6','#22c55e','#f59e0b','#ec4899','#06b6d4'];
-  state.charts.type = new Chart($('chartType'), {
-    type: 'bar',
-    data: {
-      labels: typeLabels,
-      datasets:[{
-        label: 'Tickets',
-        data: typeLabels.map(t => typeCounts[t]),
-        backgroundColor: typeLabels.map((_,i) => typeColors[i % typeColors.length]),
-        borderRadius: 6,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend:{ display:false } },
-      scales: {
-        y: { beginAtZero:true, ticks:{ font:{ family:'Space Grotesk' } } },
-        x: { ticks:{ font:{ family:'Space Grotesk', size:10 } } }
-      }
-    }
-  });
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  TABLE RENDER
-// ═══════════════════════════════════════════════════════════════
-function pill(type, label) {
-  return `<span class="pill ${type}"><span class="pill-dot"></span>${esc(label)}</span>`;
-}
-
-function resultPill(row) {
-  if (row.finalResult === 'Corrected') return pill('corrected','Corrected');
-  if (row.finalResult === 'Error')     return pill('err','Error');
-  if (row.exceptionApplied)           return pill('warn','Exception');
+/* ═══ TABLE ═══════════════════════════════════════════════════ */
+function pill(cls,lbl){return `<span class="pill ${cls}"><span class="pdot"></span>${esc(lbl)}</span>`;}
+function rPill(r){
+  if(r.fRes==='Corrected') return pill('co','Corrected');
+  if(r.fRes==='Error')     return pill('er','Error');
+  if(r.excA)               return pill('wn','Exception');
   return pill('ok','Matched');
 }
-
-function cellClass(valid, exception) {
-  if (exception) return '';
-  return valid ? '' : 'mismatch';
-}
-
-function renderTable(rows) {
-  const body = $('resultsBody');
-  if (!rows.length) {
-    body.innerHTML = `<tr><td colspan="23" class="empty-state">No rows match the current filters.</td></tr>`;
-    return;
-  }
-
-  body.innerHTML = rows.map(row => {
-    const rowClass = row.finalResult === 'Corrected' ? 'row-corrected'
-                   : row.finalResult === 'Error'     ? 'row-error'
-                   : row.exceptionApplied            ? 'row-exception'
-                   :                                   'row-matched';
-    const actionBtn = row.finalResult === 'Corrected'
-      ? `<button class="action-btn done" disabled>✓ Corrected</button>`
-      : row.validationResult === 'Error'
-      ? `<button class="action-btn mark" data-cid="${esc(row.rowId)}">Correct</button>`
-      : `<span style="color:var(--text3);font-size:11px">—</span>`;
-
-    return `<tr class="${rowClass}">
-      <td style="color:var(--text3);font-size:11px">${esc(row.sourceRowNumber)}</td>
-      <td><strong>${esc(row.ticket)}</strong></td>
-      <td>${esc(row.ticketType)}</td>
-      <td style="font-size:11px;color:var(--text2)">${esc(row.assignedCompany)}</td>
-      <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(row.filterDate)}</td>
-      <td class="${row.statusOk?'':'mismatch'}">${esc(row.ieFnStatus)}</td>
-      <td class="${cellClass(row.nameValid, false)}">${esc(row.ieFeName)}</td>
-      <td class="${cellClass(row.dateValid, row.dateException)}" style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(row.ieDueDate)}</td>
-      <td class="${cellClass(row.timeValid, row.timeException)}" style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(row.ieDueTime)}</td>
-      <td style="font-size:11px;color:var(--text2)">${esc([row.ieScheduledDate,row.ieScheduledTime].filter(Boolean).join(' '))}</td>
-      <td style="font-size:11px">${esc(row.fnStatus)}</td>
-      <td class="${cellClass(row.nameValid, false)}">${esc(row.fnFeName)}</td>
-      <td class="${cellClass(row.dateValid, row.dateException)}" style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(row.fnScheduledDate)}</td>
-      <td class="${cellClass(row.timeValid, row.timeException)}" style="font-family:'JetBrains Mono',monospace;font-size:11px">${esc(row.fnScheduledTime)}</td>
-      <td>${row.statusOk ? pill('ok','OK') : pill('err','Error')}</td>
-      <td>${row.dateValid ? pill(row.dateException?'warn':'ok', row.dateException?'ITD':'OK') : pill('err','Error')}</td>
-      <td>${row.timeValid ? pill(row.timeException?'warn':'ok', row.timeException?row.ticketType:'OK') : pill('err','Error')}</td>
-      <td>${row.nameValid ? pill('ok','OK') : pill('err','Error')}</td>
-      <td>${row.exceptionApplied ? pill('warn', row.exceptionType) : '<span style="color:var(--text3);font-size:11px">—</span>'}</td>
-      <td>${resultPill(row)}</td>
-      <td class="details-cell">${esc(row.issueDetails)}</td>
-      <td class="note-cell">${esc(row.trackingNote)}</td>
-      <td>${actionBtn}</td>
+function mc(v,ex){return(!v&&!ex)?'mm':'';}
+function renderTable(rows){
+  if(!rows.length){E.tbody.innerHTML=`<tr><td colspan="23" class="emp">No rows match the current filters.</td></tr>`;return;}
+  E.tbody.innerHTML=rows.map(r=>{
+    const rc=r.fRes==='Corrected'?'rc':r.fRes==='Error'?'re':r.excA?'rx':'rm';
+    const act=r.fRes==='Corrected'
+      ?`<button class="abtn dn" disabled>✓ Corrected</button>`
+      :r.vRes==='Error'
+      ?`<button class="abtn mk" data-cid="${esc(r.rowId)}">Correct</button>`
+      :`<span style="color:var(--text3)">—</span>`;
+    return `<tr class="${rc}">
+      <td class="mn" style="color:var(--text3)">${esc(r.srcRow)}</td>
+      <td><strong>${esc(r.ticket)}</strong></td>
+      <td>${esc(r.type)}</td>
+      <td style="font-size:11px;color:var(--text2)">${esc(r.company)}</td>
+      <td class="mn">${esc(r.filterDate)}</td>
+      <td class="${r.sOk?'':'mm'}">${esc(r.ieFnStatus)}</td>
+      <td class="${mc(r.nVal,false)}">${esc(r.ieFEN)}</td>
+      <td class="mn ${mc(r.dVal,r.dExc)}">${esc(r.ieDueDate)}</td>
+      <td class="mn ${mc(r.tVal,r.tExc)}">${esc(r.ieDueTime)}</td>
+      <td class="mn" style="color:var(--text2)">${esc([r.ieSD,r.ieST].filter(Boolean).join(' '))}</td>
+      <td style="font-size:11px">${esc(r.fnStatus)}</td>
+      <td class="${mc(r.nVal,false)}">${esc(r.fnFEN)}</td>
+      <td class="mn ${mc(r.dVal,r.dExc)}">${esc(r.fnSD)}</td>
+      <td class="mn ${mc(r.tVal,r.tExc)}">${esc(r.fnST)}</td>
+      <td>${r.sOk?pill('ok','OK'):pill('er','Error')}</td>
+      <td>${r.dVal?pill(r.dExc?'wn':'ok',r.dExc?'ITD':'OK'):pill('er','Error')}</td>
+      <td>${r.tVal?pill(r.tExc?'wn':'ok',r.tExc?r.type:'OK'):pill('er','Error')}</td>
+      <td>${r.nVal?pill('ok','OK'):pill('er','Error')}</td>
+      <td>${r.excA?pill('wn',r.excT):'<span style="color:var(--text3);font-size:11px">—</span>'}</td>
+      <td>${rPill(r)}</td>
+      <td class="dcl2">${esc(r.det)}</td>
+      <td class="ncl">${esc(r.note)}</td>
+      <td>${act}</td>
     </tr>`;
   }).join('');
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  CORRECTION TRACKING
-// ═══════════════════════════════════════════════════════════════
-function markCorrected(rowId) {
-  const row = state.raw.find(r => r.rowId === rowId);
-  if (!row || row.validationResult !== 'Error' || row.tracking.correctedMarked) return;
-  row.tracking.correctedMarked = true;
-  row.tracking.correctedAt = ts();
-  recomputeRow(row);
-  persistState();
-  applyFilters();
+/* ═══ CORRECTION ══════════════════════════════════════════════ */
+function markCorrected(id){
+  const r=S.raw.find(x=>x.rowId===id);
+  if(!r||r.vRes!=='Error'||r.trk.correctedMarked) return;
+  r.trk.correctedMarked=true;r.trk.correctedAt=nowStr();
+  recomp(r);saveState();applyFilters();
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  PERSISTENCE
-// ═══════════════════════════════════════════════════════════════
-function storageKey() {
-  if (!state.fileMeta) return null;
-  const { name, size, lastModified } = state.fileMeta;
-  return `vra:${name}:${size}:${lastModified}`;
+/* ═══ PERSISTENCE ═════════════════════════════════════════════ */
+function sKey(){if(!S.fileMeta)return null;return `vra3:${S.fileMeta.name}:${S.fileMeta.size}:${S.fileMeta.lastModified}`;}
+function saveState(){
+  const k=sKey();if(!k)return;
+  try{localStorage.setItem(k,JSON.stringify({
+    eTo:E.eTo.value||'',eCc:E.eCc.value||'',eSubj:E.eSubj.value||'',
+    f:{q:E.srch.value||'',t:E.typeF.value||'all',sp:E.specD.value||'',fr:E.fromD.value||'',to:E.toD.value||'',st:E.statF.value||'all'},
+    trk:S.raw.reduce((a,r)=>{if(r.trk.correctedMarked)a[r.rowId]=r.trk;return a;},{}),
+  }));}catch(_){}
+}
+function loadState(){
+  const k=sKey();if(!k)return;
+  try{
+    const raw=localStorage.getItem(k);if(!raw)return;
+    const p=JSON.parse(raw);
+    S.raw.forEach(r=>{r.trk=p.trk?.[r.rowId]?{...defTrk(),...p.trk[r.rowId]}:defTrk();recomp(r);});
+    E.eTo.value=p.eTo||'';E.eCc.value=p.eCc||'';E.eSubj.value=p.eSubj||'';
+    E.srch.value=p.f?.q||'';E.typeF.value=p.f?.t||'all';E.specD.value=p.f?.sp||'';
+    E.fromD.value=p.f?.fr||'';E.toD.value=p.f?.to||'';E.statF.value=p.f?.st||'all';
+  }catch(_){}
 }
 
-function persistState() {
-  const key = storageKey(); if (!key) return;
-  try {
-    localStorage.setItem(key, JSON.stringify({
-      emailTo: $('emailTo').value || '',
-      emailCc: $('emailCc').value || '',
-      emailSubject: $('emailSubject').value || '',
-      filters: {
-        search: $('searchInput').value || '',
-        type:   $('ticketTypeFilter').value || 'all',
-        specific: $('specificDateFilter').value || '',
-        from:   $('fromDateFilter').value || '',
-        to:     $('toDateFilter').value || '',
-        status: $('statusFilter').value || 'all',
-      },
-      tracking: state.raw.reduce((a, r) => {
-        if (r.tracking.correctedMarked) a[r.rowId] = r.tracking; return a;
-      }, {}),
-    }));
-  } catch (_) {}
+/* ═══ EXPORT ══════════════════════════════════════════════════ */
+function autoW(ws,rows){
+  const w=[];rows.forEach(r=>Object.values(r).forEach((v,i)=>{w[i]=Math.min(Math.max(w[i]||10,String(v??'').length+2),42);}));
+  ws['!cols']=w.map(wch=>({wch}));
 }
-
-function loadPersistedState() {
-  const key = storageKey(); if (!key) return;
-  try {
-    const raw = localStorage.getItem(key); if (!raw) return;
-    const p = JSON.parse(raw);
-    state.raw.forEach(r => {
-      r.tracking = p.tracking?.[r.rowId] ? { ...defaultTracking(), ...p.tracking[r.rowId] } : defaultTracking();
-      recomputeRow(r);
-    });
-    $('emailTo').value = p.emailTo || '';
-    $('emailCc').value = p.emailCc || '';
-    $('emailSubject').value = p.emailSubject || '';
-    $('searchInput').value = p.filters?.search || '';
-    $('ticketTypeFilter').value = p.filters?.type || 'all';
-    $('specificDateFilter').value = p.filters?.specific || '';
-    $('fromDateFilter').value = p.filters?.from || '';
-    $('toDateFilter').value = p.filters?.to || '';
-    $('statusFilter').value = p.filters?.status || 'all';
-  } catch (_) {}
+function mkRows(rows){
+  return rows.map(r=>({'Excel Row':r.srcRow,'Ticket':r.ticket,'Ticket Type':r.type,'Company':r.company,
+    'Filter Date':r.filterDate,'IE&FN Status':r.ieFnStatus,'IE FE Name':r.ieFEN,
+    'IE Due Date':r.ieDueDate,'IE Due Time':r.ieDueTime,
+    'FN Status':r.fnStatus,'FN FE Name':r.fnFEN,'FN Sched Date':r.fnSD,'FN Sched Time':r.fnST,
+    'Status Check':r.sOk?'OK':'Error','Date Check':r.dVal?(r.dExc?'OK via ITD':'OK'):'Error',
+    'Time Check':r.tVal?(r.tExc?`OK via ${r.type}`:'OK'):'Error','Name Check':r.nVal?'OK':'Error',
+    'Exception':r.excT||'None','Validation':r.vRes,'Final Result':r.fRes,'Details':r.det,'Note':r.note}));
 }
+function stamp(){const n=new Date();return `${n.getFullYear()}${p2(n.getMonth()+1)}${p2(n.getDate())}_${p2(n.getHours())}${p2(n.getMinutes())}`;}
+function dl(blob,name){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),500);}
 
-// ═══════════════════════════════════════════════════════════════
-//  EXPORT — XLSX
-// ═══════════════════════════════════════════════════════════════
-function autoWidth(ws, rows) {
-  const w = [];
-  rows.forEach(r => Object.values(r).forEach((v, i) => { w[i] = Math.min(Math.max(w[i]||10, String(v??'').length+2), 40); }));
-  ws['!cols'] = w.map(wch => ({ wch }));
-}
-
-function makeExportRows(rows) {
-  return rows.map(r => ({
-    'Excel Row': r.sourceRowNumber,
-    'Ticket': r.ticket,
-    'Ticket Type': r.ticketType,
-    'Assigned Company': r.assignedCompany,
-    'Filter Date': r.filterDate,
-    'IE & FN Status': r.ieFnStatus,
-    'IE FE Name': r.ieFeName,
-    'IE Due Date': r.ieDueDate,
-    'IE Due Time': r.ieDueTime,
-    'FN Status': r.fnStatus,
-    'FN FE Name': r.fnFeName,
-    'FN Scheduled Date': r.fnScheduledDate,
-    'FN Scheduled Time': r.fnScheduledTime,
-    'Status Check': r.statusOk ? 'OK' : 'Error',
-    'Date Check': r.dateValid ? (r.dateException ? 'OK via ITD' : 'OK') : 'Error',
-    'Time Check': r.timeValid ? (r.timeException ? `OK via ${r.ticketType}` : 'OK') : 'Error',
-    'Name Check': r.nameValid ? 'OK' : 'Error',
-    'Exception': r.exceptionType || 'None',
-    'Validation': r.validationResult,
-    'Final Result': r.finalResult,
-    'Details': r.issueDetails,
-    'Tracking Note': r.trackingNote,
-  }));
-}
-
-function buildSummaryRows(s, sv) {
-  return [
-    ['Metric', 'All Data', 'Current Filter'],
-    ['Total Tickets', s.total, sv.total],
-    ['Matched', s.matched, sv.matched],
-    ['Corrected', s.corrected, sv.corrected],
-    ['Open Errors', s.errors, sv.errors],
-    ['Exceptions', s.exceptions, sv.exceptions],
-    ['Completion %', s.completion, sv.completion],
-    ['Status Errors', s.statusErr, sv.statusErr],
-    ['Date Errors', s.dateErr, sv.dateErr],
-    ['Time Errors', s.timeErr, sv.timeErr],
-    ['Name Errors', s.nameErr, sv.nameErr],
-    [''],
-    ['File', state.fileMeta?.name || '', ''],
-    ['Generated At', new Date().toLocaleString(), ''],
-    ['Search', $('searchInput').value || 'none', ''],
-    ['Specific Date', $('specificDateFilter').value || 'none', ''],
-    ['From Date', $('fromDateFilter').value || 'none', ''],
-    ['To Date', $('toDateFilter').value || 'none', ''],
-    ['Status Filter', $('statusFilter').value, ''],
-    ['Ticket Type', $('ticketTypeFilter').value, ''],
+function buildWB(){
+  const wb=XLSX.utils.book_new(),s=calcStats(S.raw),sv=calcStats(S.filtered);
+  const sumR=[
+    ['Metric','All Data','Current Filter'],
+    ['Total',s.n,sv.n],['Matched',s.m,sv.m],['Corrected',s.c,sv.c],['Errors',s.e,sv.e],
+    ['Exceptions',s.x,sv.x],['Completion %',s.cp,sv.cp],['Status Errs',s.se,sv.se],
+    ['Date Errs',s.de,sv.de],['Time Errs',s.te,sv.te],['Name Errs',s.ne,sv.ne],[''],
+    ['File',S.fileMeta?.name||'',''],['Generated',new Date().toLocaleString(),''],
+    ['Search',E.srch.value||'none',''],['Specific Date',E.specD.value||'none',''],
+    ['From',E.fromD.value||'none',''],['To',E.toD.value||'none',''],
+    ['Status',E.statF.value||'all',''],['Type',E.typeF.value||'all',''],
   ];
-}
-
-function getChartImageURL(key) {
-  try {
-    const ch = state.charts[key];
-    return ch ? ch.toBase64Image('image/png', 1) : null;
-  } catch (_) { return null; }
-}
-
-function buildWorkbook() {
-  const wb = XLSX.utils.book_new();
-  const s  = computeStats(state.raw);
-  const sv = computeStats(state.filtered);
-
-  const summaryRows = buildSummaryRows(s, sv);
-  const allRows     = makeExportRows(state.raw);
-  const errRows     = makeExportRows(state.raw.filter(r => r.finalResult === 'Error'));
-  const corRows     = makeExportRows(state.raw.filter(r => r.finalResult === 'Corrected'));
-  const visRows     = makeExportRows(state.filtered);
-
-  const wsSum = XLSX.utils.aoa_to_sheet(summaryRows);
-  wsSum['!cols'] = [{ wch:28 },{ wch:20 },{ wch:20 }];
-
-  const wsAll = XLSX.utils.json_to_sheet(allRows);
-  autoWidth(wsAll, allRows);
-
-  const wsVis = XLSX.utils.json_to_sheet(visRows.length ? visRows : [{ Info:'No rows in filter view' }]);
-  autoWidth(wsVis, visRows.length ? visRows : [{ Info:'' }]);
-
-  const wsErr = XLSX.utils.json_to_sheet(errRows.length ? errRows : [{ Info:'No open errors' }]);
-  autoWidth(wsErr, errRows.length ? errRows : [{ Info:'' }]);
-
-  const wsCor = XLSX.utils.json_to_sheet(corRows.length ? corRows : [{ Info:'No corrected rows yet' }]);
-  autoWidth(wsCor, corRows.length ? corRows : [{ Info:'' }]);
-
-  XLSX.utils.book_append_sheet(wb, wsSum,  'Summary');
-  XLSX.utils.book_append_sheet(wb, wsAll,  'Final_Report');
-  XLSX.utils.book_append_sheet(wb, wsVis,  'Current_Filter_View');
-  XLSX.utils.book_append_sheet(wb, wsErr,  'Open_Errors');
-  XLSX.utils.book_append_sheet(wb, wsCor,  'Corrected_Rows');
-
+  const allR=mkRows(S.raw),visR=mkRows(S.filtered),errR=mkRows(S.raw.filter(r=>r.fRes==='Error')),corR=mkRows(S.raw.filter(r=>r.fRes==='Corrected'));
+  const wS=XLSX.utils.aoa_to_sheet(sumR);wS['!cols']=[{wch:26},{wch:18},{wch:18}];
+  const wA=XLSX.utils.json_to_sheet(allR);autoW(wA,allR);
+  const wV=XLSX.utils.json_to_sheet(visR.length?visR:[{Info:'No rows in filter'}]);autoW(wV,visR.length?visR:[{Info:''}]);
+  const wE=XLSX.utils.json_to_sheet(errR.length?errR:[{Info:'No open errors'}]);autoW(wE,errR.length?errR:[{Info:''}]);
+  const wC=XLSX.utils.json_to_sheet(corR.length?corR:[{Info:'No corrected rows'}]);autoW(wC,corR.length?corR:[{Info:''}]);
+  XLSX.utils.book_append_sheet(wb,wS,'Summary');
+  XLSX.utils.book_append_sheet(wb,wA,'Final_Report');
+  XLSX.utils.book_append_sheet(wb,wV,'Current_Filter_View');
+  XLSX.utils.book_append_sheet(wb,wE,'Open_Errors');
+  XLSX.utils.book_append_sheet(wb,wC,'Corrected_Rows');
   return wb;
 }
-
-function stamp() {
-  const n = new Date();
-  return `${n.getFullYear()}${pad2(n.getMonth()+1)}${pad2(n.getDate())}_${pad2(n.getHours())}${pad2(n.getMinutes())}`;
+function exportXlsx(){
+  if(!S.raw.length||!libsOk())return;
+  try{const wb=buildWB(),buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+    dl(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),`validation_report_${stamp()}.xlsx`);
+  }catch(err){showBan(`Export failed: ${err.message}`);showDbg('XLSX export error',err.stack||String(err));}
+}
+function toB64(buf){let b='',u=new Uint8Array(buf);for(let i=0;i<u.length;i+=0x8000)b+=String.fromCharCode(...u.subarray(i,i+0x8000));return btoa(b).match(/.{1,76}/g).join('\r\n');}
+function exportEml(){
+  if(!S.raw.length||!libsOk())return;
+  try{
+    const wb=buildWB(),buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+    const fn=`validation_report_${stamp()}.xlsx`,b64=toB64(buf),sv=calcStats(S.filtered);
+    const bnd=`----=_B${Date.now()}`,to=norm(E.eTo.value),cc=norm(E.eCc.value);
+    const subj=norm(E.eSubj.value)||`Final Validation Report — ${S.fileMeta?.name||''}`;
+    const body=`Hello,\r\n\r\nValidation report attached.\r\n\r\nTickets:${sv.n} | Matched:${sv.m} | Corrected:${sv.c} | Errors:${sv.e} | Completion:${sv.cp}%\r\n\r\nAttachment: ${fn}\r\n\r\nRegards.`;
+    const lines=[`To: ${to}`,cc?`Cc: ${cc}`:null,`Subject: ${subj}`,
+      'MIME-Version: 1.0',`Content-Type: multipart/mixed; boundary="${bnd}"`, '',
+      `--${bnd}`,'Content-Type: text/plain; charset="utf-8"','Content-Transfer-Encoding: 8bit','',body,'',
+      `--${bnd}`,`Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="${fn}"`,
+      `Content-Disposition: attachment; filename="${fn}"`,'Content-Transfer-Encoding: base64','',b64,'',`--${bnd}--`,'',
+    ].filter(l=>l!==null).join('\r\n');
+    dl(new Blob([lines],{type:'message/rfc822'}),`validation_email_${stamp()}.eml`);
+  }catch(err){showBan(`Email export failed: ${err.message}`);showDbg('EML export error',err.stack||String(err));}
 }
 
-function download(blob, name) {
-  const u = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = u; a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(u), 500);
+/* ═══ SELF-TEST ════════════════════════════════════════════════ */
+function selfTest(){
+  const iss=[];
+  if(typeof XLSX==='undefined') iss.push('SheetJS not loaded — Excel files cannot be processed');
+  if(typeof Chart==='undefined') iss.push('Chart.js not loaded — charts will not render');
+  if(!window.FileReader) iss.push('FileReader API missing — cannot read local files');
+  if(iss.length){
+    showBan(`⚠ ${iss.join(' | ')}. Try disabling ad-blockers or use Chrome/Edge.`,'warn');
+    if(typeof XLSX==='undefined') showDbg('Critical: SheetJS failed to load',iss.join('\n')+'\n\nCheck your network, disable extensions, then refresh.');
+  }
 }
 
-function exportXlsx() {
-  if (!state.raw.length || typeof XLSX === 'undefined') return;
-  const wb  = buildWorkbook();
-  const buf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-  download(new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-    `validation_report_${stamp()}.xlsx`);
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  EXPORT — EMAIL (.eml)
-// ═══════════════════════════════════════════════════════════════
-function b64(buf) {
-  let b = '', u = new Uint8Array(buf);
-  for (let i = 0; i < u.length; i += 0x8000) b += String.fromCharCode(...u.subarray(i, i+0x8000));
-  return btoa(b).match(/.{1,76}/g).join('\r\n');
-}
-
-function exportEmail() {
-  if (!state.raw.length || typeof XLSX === 'undefined') return;
-  const wb  = buildWorkbook();
-  const buf = XLSX.write(wb, { bookType:'xlsx', type:'array' });
-  const fname = `validation_report_${stamp()}.xlsx`;
-  const b64data = b64(buf);
-  const sv = computeStats(state.filtered);
-  const bnd = `----=_B${Date.now()}`;
-  const to  = norm($('emailTo').value);
-  const cc  = norm($('emailCc').value);
-  const subj= norm($('emailSubject').value) || `Final Validation Report — ${state.fileMeta?.name || ''}`;
-  const body = [
-    'Hello,','','Please find the validation report attached.','',
-    'Summary (current filter view):',
-    `  Tickets: ${sv.total}`,
-    `  Matched: ${sv.matched}`,
-    `  Corrected: ${sv.corrected}`,
-    `  Open Errors: ${sv.errors}`,
-    `  Exceptions: ${sv.exceptions}`,
-    `  Completion: ${sv.completion}%`,
-    '',`Attachment: ${fname}`,'','Regards.',
-  ].join('\r\n');
-
-  const lines = [
-    `To: ${to}`, cc ? `Cc: ${cc}` : null, `Subject: ${subj}`,
-    'MIME-Version: 1.0', `Content-Type: multipart/mixed; boundary="${bnd}"`, '',
-    `--${bnd}`, 'Content-Type: text/plain; charset="utf-8"', 'Content-Transfer-Encoding: 8bit', '', body, '',
-    `--${bnd}`,
-    `Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="${fname}"`,
-    `Content-Disposition: attachment; filename="${fname}"`,
-    'Content-Transfer-Encoding: base64', '', b64data, '',
-    `--${bnd}--`, '',
-  ].filter(l => l !== null).join('\r\n');
-
-  download(new Blob([lines], { type:'message/rfc822' }), `validation_email_${stamp()}.eml`);
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  EVENT BINDING
-// ═══════════════════════════════════════════════════════════════
-function bindAll() {
-  if (typeof XLSX === 'undefined') showBanner('Excel library failed to load. Check network, then refresh.');
-
-  // Dropzone
-  const dz = $('dropzone'), fi = $('fileInput');
-  dz.addEventListener('click', () => fi.click());
-  fi.addEventListener('change', ev => { const f = ev.target.files?.[0]; if (f) handleWorkbook(f); });
-  dz.addEventListener('dragover', ev => { ev.preventDefault(); dz.classList.add('drag'); });
-  dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
-  dz.addEventListener('drop', ev => {
-    ev.preventDefault(); dz.classList.remove('drag');
-    const f = ev.dataTransfer.files?.[0]; if (f) handleWorkbook(f);
+/* ═══ BIND ═════════════════════════════════════════════════════ */
+function bindAll(){
+  selfTest();
+  const dz=E.dz,fi=E.fi;
+  dz.addEventListener('click',()=>fi.click());
+  fi.addEventListener('change',ev=>{const f=ev.target.files?.[0];if(f)handleWB(f);});
+  dz.addEventListener('dragover',ev=>{ev.preventDefault();dz.classList.add('dr');});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('dr'));
+  dz.addEventListener('drop',ev=>{ev.preventDefault();dz.classList.remove('dr');const f=ev.dataTransfer.files?.[0];if(f)handleWB(f);});
+  $('applyBtn').addEventListener('click',applyFilters);
+  $('clearBtn').addEventListener('click',clearF);
+  $('xlsxBtn').addEventListener('click',exportXlsx);
+  $('emlBtn').addEventListener('click',exportEml);
+  ['srch','typeF','statF','specD','fromD','toD'].forEach(id=>{
+    $(id).addEventListener('input',applyFilters);$(id).addEventListener('change',applyFilters);
   });
-
-  // Buttons
-  $('applyBtn').addEventListener('click', applyFilters);
-  $('clearBtn').addEventListener('click', clearFilters);
-  $('exportXlsxBtn').addEventListener('click', exportXlsx);
-  $('exportEmailBtn').addEventListener('click', exportEmail);
-
-  // Filters — live update
-  ['searchInput','ticketTypeFilter','specificDateFilter','fromDateFilter','toDateFilter','statusFilter']
-    .forEach(id => {
-      $(id).addEventListener('input', applyFilters);
-      $(id).addEventListener('change', applyFilters);
-    });
-
-  // Email fields — persist on change
-  ['emailTo','emailCc','emailSubject'].forEach(id => $(id).addEventListener('change', persistState));
-
-  // Table delegation for "Correct" buttons
-  $('resultsBody').addEventListener('click', ev => {
-    const btn = ev.target.closest('[data-cid]');
-    if (btn) markCorrected(btn.getAttribute('data-cid'));
-  });
+  ['eTo','eCc','eSubj'].forEach(id=>$(id).addEventListener('change',saveState));
+  E.tbody.addEventListener('click',ev=>{const b=ev.target.closest('[data-cid]');if(b)markCorrected(b.getAttribute('data-cid'));});
+  window.addEventListener('error',ev=>{console.error('[VRA]',ev.error||ev.message);showBan(`Error: ${ev.message||'Unknown'}`);});
+  window.addEventListener('unhandledrejection',ev=>{console.error('[VRA]',ev.reason);showBan(`Async error: ${ev.reason?.message||ev.reason||'Unknown'}`);});
 }
 
-window.addEventListener('error', ev => {
-  showBanner(`Runtime error: ${ev.message || 'Unknown'}`);
-});
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', bindAll);
-} else {
-  bindAll();
-}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bindAll);
+else bindAll();
 </script>
 </body>
 </html>
