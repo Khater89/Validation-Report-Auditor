@@ -33,6 +33,24 @@
     }
   </script>
 
+  <!-- jsPDF for PDF generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+          onerror="window.__jsPDFFail=true"></script>
+  <script>
+    if (window.__jsPDFFail || typeof window.jspdf === 'undefined') {
+      document.write('<scr'+'ipt src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"><\/scr'+'ipt>');
+    }
+  </script>
+
+  <!-- html2canvas for chart snapshot in PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
+          onerror="window.__h2cFail=true"></script>
+  <script>
+    if (window.__h2cFail || typeof html2canvas === 'undefined') {
+      document.write('<scr'+'ipt src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"><\/scr'+'ipt>');
+    }
+  </script>
+
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
 
@@ -140,8 +158,6 @@
     .bo{background:var(--fn);color:#fff;}
     .bg{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
 
-    .eml-sec{border-top:1px solid var(--border);margin-top:10px;padding-top:10px;}
-    .eml-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:7px;}
     .fn-note{font-size:11px;color:var(--text3);margin-top:7px;line-height:1.6;}
 
     /* TABLE */
@@ -173,6 +189,13 @@
     .mn{font-family:'JetBrains Mono',monospace;font-size:11px;}
     .h{display:none!important;}
 
+    /* PDF LOADING OVERLAY */
+    #pdfOverlay{position:fixed;inset:0;background:rgba(15,23,42,.85);z-index:9998;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;}
+    #pdfOverlay.h{display:none;}
+    .pdf-spin{width:48px;height:48px;border:4px solid rgba(255,255,255,.2);border-top-color:#f97316;border-radius:50%;animation:spin .8s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    .pdf-spin-lbl{color:#fff;font-weight:700;font-size:15px;}
+
     @media(max-width:1100px){.cgrid{grid-template-columns:1fr 1fr;}}
     @media(max-width:720px){
       .main{padding:10px 10px 50px;} .cgrid{grid-template-columns:1fr;}
@@ -195,6 +218,12 @@
     </p>
     <button class="dcl" onclick="document.getElementById('dbg').classList.add('h')">✕ Dismiss &amp; Try Again</button>
   </div>
+</div>
+
+<!-- PDF GENERATION OVERLAY -->
+<div id="pdfOverlay" class="h">
+  <div class="pdf-spin"></div>
+  <div class="pdf-spin-lbl">Generating Management Report PDF…</div>
 </div>
 
 <!-- RUNTIME BANNER -->
@@ -256,16 +285,7 @@
     <div class="tr">
       <button class="btn bd" id="applyBtn">🔍 Apply</button>
       <button class="btn bg" id="clearBtn">✕ Clear</button>
-      <button class="btn bb" id="xlsxBtn">⬇ Export XLSX</button>
-      <button class="btn bo" id="emlBtn">📧 Export Email (.eml)</button>
-    </div>
-    <div class="eml-sec">
-      <div class="eml-lbl">Outlook Email Draft</div>
-      <div class="tr" style="margin-bottom:0">
-        <div class="fg" style="flex:1"><input type="text" id="eTo" placeholder="To:" /></div>
-        <div class="fg" style="flex:1"><input type="text" id="eCc" placeholder="CC:" /></div>
-        <div class="fg" style="flex:2"><input type="text" id="eSubj" placeholder="Subject" /></div>
-      </div>
+      <button class="btn bo" id="pdfBtn">📄 Export Management PDF</button>
     </div>
     <div class="fn-note">📅 Date filter uses <strong>FN Scheduled Date</strong> first, then <strong>IE Due Date</strong> as fallback. &nbsp;·&nbsp; ⚡ ITD tickets always pass date validation.</div>
   </div>
@@ -309,7 +329,7 @@ const E={
   dash:$('dash'),sg:$('sgrid'),pb:$('pbar'),pl:$('plbl'),
   tb:$('tbp'),tbl:$('tbl'),tbody:$('tbody'),
   srch:$('srch'),typeF:$('typeF'),statF:$('statF'),specD:$('specD'),fromD:$('fromD'),toD:$('toD'),
-  stag:$('stag'),eTo:$('eTo'),eCc:$('eCc'),eSubj:$('eSubj'),
+  stag:$('stag'),
 };
 
 /* ═══ BANNER / DEBUG ══════════════════════════════════════════ */
@@ -472,7 +492,6 @@ function handleWB(file){
         return;
       }
       popTypes();loadState();
-      if(!norm(E.eSubj.value)) E.eSubj.value=`Final Validation Report — ${file.name.replace(/\.[^.]+$/,'')}`;
       ['dash','tbp','tbl'].forEach(id=>$(id).classList.remove('h'));
       applyFilters();
     } catch(err){
@@ -627,7 +646,6 @@ function sKey(){if(!S.fileMeta)return null;return `vra3:${S.fileMeta.name}:${S.f
 function saveState(){
   const k=sKey();if(!k)return;
   try{localStorage.setItem(k,JSON.stringify({
-    eTo:E.eTo.value||'',eCc:E.eCc.value||'',eSubj:E.eSubj.value||'',
     f:{q:E.srch.value||'',t:E.typeF.value||'all',sp:E.specD.value||'',fr:E.fromD.value||'',to:E.toD.value||'',st:E.statF.value||'all'},
     trk:S.raw.reduce((a,r)=>{if(r.trk.correctedMarked)a[r.rowId]=r.trk;return a;},{}),
   }));}catch(_){}
@@ -638,77 +656,488 @@ function loadState(){
     const raw=localStorage.getItem(k);if(!raw)return;
     const p=JSON.parse(raw);
     S.raw.forEach(r=>{r.trk=p.trk?.[r.rowId]?{...defTrk(),...p.trk[r.rowId]}:defTrk();recomp(r);});
-    E.eTo.value=p.eTo||'';E.eCc.value=p.eCc||'';E.eSubj.value=p.eSubj||'';
     E.srch.value=p.f?.q||'';E.typeF.value=p.f?.t||'all';E.specD.value=p.f?.sp||'';
     E.fromD.value=p.f?.fr||'';E.toD.value=p.f?.to||'';E.statF.value=p.f?.st||'all';
   }catch(_){}
 }
 
-/* ═══ EXPORT ══════════════════════════════════════════════════ */
-function autoW(ws,rows){
-  const w=[];rows.forEach(r=>Object.values(r).forEach((v,i)=>{w[i]=Math.min(Math.max(w[i]||10,String(v??'').length+2),42);}));
-  ws['!cols']=w.map(wch=>({wch}));
-}
-function mkRows(rows){
-  return rows.map(r=>({'Excel Row':r.srcRow,'Ticket':r.ticket,'Ticket Type':r.type,'Company':r.company,
-    'Filter Date':r.filterDate,'IE&FN Status':r.ieFnStatus,'IE FE Name':r.ieFEN,
-    'IE Due Date':r.ieDueDate,'IE Due Time':r.ieDueTime,
-    'FN Status':r.fnStatus,'FN FE Name':r.fnFEN,'FN Sched Date':r.fnSD,'FN Sched Time':r.fnST,
-    'Status Check':r.sOk?'OK':'Error','Date Check':r.dVal?(r.dExc?'OK via ITD':'OK'):'Error',
-    'Time Check':r.tVal?(r.tExc?`OK via ${r.type}`:'OK'):'Error','Name Check':r.nVal?'OK':'Error',
-    'Exception':r.excT||'None','Validation':r.vRes,'Final Result':r.fRes,'Details':r.det,'Note':r.note}));
-}
+/* ═══ EXPORT — MANAGEMENT PDF ════════════════════════════════
+   Uses jsPDF (text/shapes) + html2canvas (chart snapshots).
+   Produces a corporate A4 PDF with:
+     • Header bar with gradient branding
+     • Executive KPI cards
+     • Pie + Bar chart images
+     • Anomaly details table (errors + corrected rows)
+     • Footer with timestamp and filter context
+   ════════════════════════════════════════════════════════════ */
+
 function stamp(){const n=new Date();return `${n.getFullYear()}${p2(n.getMonth()+1)}${p2(n.getDate())}_${p2(n.getHours())}${p2(n.getMinutes())}`;}
 function dl(blob,name){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),500);}
 
-function buildWB(){
-  const wb=XLSX.utils.book_new(),s=calcStats(S.raw),sv=calcStats(S.filtered);
-  const sumR=[
-    ['Metric','All Data','Current Filter'],
-    ['Total',s.n,sv.n],['Matched',s.m,sv.m],['Corrected',s.c,sv.c],['Errors',s.e,sv.e],
-    ['Exceptions',s.x,sv.x],['Completion %',s.cp,sv.cp],['Status Errs',s.se,sv.se],
-    ['Date Errs',s.de,sv.de],['Time Errs',s.te,sv.te],['Name Errs',s.ne,sv.ne],[''],
-    ['File',S.fileMeta?.name||'',''],['Generated',new Date().toLocaleString(),''],
-    ['Search',E.srch.value||'none',''],['Specific Date',E.specD.value||'none',''],
-    ['From',E.fromD.value||'none',''],['To',E.toD.value||'none',''],
-    ['Status',E.statF.value||'all',''],['Type',E.typeF.value||'all',''],
-  ];
-  const allR=mkRows(S.raw),visR=mkRows(S.filtered),errR=mkRows(S.raw.filter(r=>r.fRes==='Error')),corR=mkRows(S.raw.filter(r=>r.fRes==='Corrected'));
-  const wS=XLSX.utils.aoa_to_sheet(sumR);wS['!cols']=[{wch:26},{wch:18},{wch:18}];
-  const wA=XLSX.utils.json_to_sheet(allR);autoW(wA,allR);
-  const wV=XLSX.utils.json_to_sheet(visR.length?visR:[{Info:'No rows in filter'}]);autoW(wV,visR.length?visR:[{Info:''}]);
-  const wE=XLSX.utils.json_to_sheet(errR.length?errR:[{Info:'No open errors'}]);autoW(wE,errR.length?errR:[{Info:''}]);
-  const wC=XLSX.utils.json_to_sheet(corR.length?corR:[{Info:'No corrected rows'}]);autoW(wC,corR.length?corR:[{Info:''}]);
-  XLSX.utils.book_append_sheet(wb,wS,'Summary');
-  XLSX.utils.book_append_sheet(wb,wA,'Final_Report');
-  XLSX.utils.book_append_sheet(wb,wV,'Current_Filter_View');
-  XLSX.utils.book_append_sheet(wb,wE,'Open_Errors');
-  XLSX.utils.book_append_sheet(wb,wC,'Corrected_Rows');
-  return wb;
-}
-function exportXlsx(){
-  if(!S.raw.length||!libsOk())return;
-  try{const wb=buildWB(),buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
-    dl(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),`validation_report_${stamp()}.xlsx`);
-  }catch(err){showBan(`Export failed: ${err.message}`);showDbg('XLSX export error',err.stack||String(err));}
-}
-function toB64(buf){let b='',u=new Uint8Array(buf);for(let i=0;i<u.length;i+=0x8000)b+=String.fromCharCode(...u.subarray(i,i+0x8000));return btoa(b).match(/.{1,76}/g).join('\r\n');}
-function exportEml(){
-  if(!S.raw.length||!libsOk())return;
+/* Capture a chart canvas → base64 PNG at 2× resolution */
+async function captureChart(canvasId){
+  const canvas=document.getElementById(canvasId);
+  if(!canvas) return null;
   try{
-    const wb=buildWB(),buf=XLSX.write(wb,{bookType:'xlsx',type:'array'});
-    const fn=`validation_report_${stamp()}.xlsx`,b64=toB64(buf),sv=calcStats(S.filtered);
-    const bnd=`----=_B${Date.now()}`,to=norm(E.eTo.value),cc=norm(E.eCc.value);
-    const subj=norm(E.eSubj.value)||`Final Validation Report — ${S.fileMeta?.name||''}`;
-    const body=`Hello,\r\n\r\nValidation report attached.\r\n\r\nTickets:${sv.n} | Matched:${sv.m} | Corrected:${sv.c} | Errors:${sv.e} | Completion:${sv.cp}%\r\n\r\nAttachment: ${fn}\r\n\r\nRegards.`;
-    const lines=[`To: ${to}`,cc?`Cc: ${cc}`:null,`Subject: ${subj}`,
-      'MIME-Version: 1.0',`Content-Type: multipart/mixed; boundary="${bnd}"`, '',
-      `--${bnd}`,'Content-Type: text/plain; charset="utf-8"','Content-Transfer-Encoding: 8bit','',body,'',
-      `--${bnd}`,`Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="${fn}"`,
-      `Content-Disposition: attachment; filename="${fn}"`,'Content-Transfer-Encoding: base64','',b64,'',`--${bnd}--`,'',
-    ].filter(l=>l!==null).join('\r\n');
-    dl(new Blob([lines],{type:'message/rfc822'}),`validation_email_${stamp()}.eml`);
-  }catch(err){showBan(`Email export failed: ${err.message}`);showDbg('EML export error',err.stack||String(err));}
+    const img=await html2canvas(canvas,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false});
+    return img.toDataURL('image/png');
+  }catch(_){ return null; }
+}
+
+/* Draw a rounded rectangle (jsPDF helper) */
+function roundRect(doc,x,y,w,h,r,fill,stroke){
+  doc.roundedRect(x,y,w,h,r,r,fill&&stroke?'FD':fill?'F':stroke?'D':'S');
+}
+
+async function exportPDF(){
+  if(!S.raw.length){ showBan('Upload a file first.'); return; }
+  if(typeof window.jspdf==='undefined'&&typeof jsPDF==='undefined'){
+    showBan('PDF library (jsPDF) failed to load. Check internet connection and refresh.');return;
+  }
+
+  // Show loading spinner
+  $('pdfOverlay').classList.remove('h');
+
+  try{
+    await new Promise(r=>setTimeout(r,50)); // allow overlay to paint
+
+    const { jsPDF } = window.jspdf||{jsPDF:window.jsPDF};
+    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+    const PW=210, PH=297; // A4
+    const M=14;  // margin
+    const CW=PW-M*2; // content width
+
+    // ── STATS LOGIC ────────────────────────────────────────
+    // sa  = entire file, no filters
+    // sdp = date-period only (ignores status/search/type filters)
+    //       This is what the PDF KPIs always show — the full picture
+    //       for the selected time window, regardless of UI status filter.
+    const sp=E.specD.value, fr=E.fromD.value, to=E.toD.value;
+    const hasDateFilter = sp||fr||to;
+
+    const datePeriodRows = hasDateFilter
+      ? S.raw.filter(r=>{
+          const d=r.filterDate||'';
+          if(sp && d!==sp) return false;
+          if(fr && d && d<fr) return false;
+          if(to && d && d>to) return false;
+          return true;
+        })
+      : S.raw;  // no date filter → use all rows
+
+    const sv=calcStats(datePeriodRows);   // KPIs: full date-period stats
+    const sa=calcStats(S.raw);            // secondary row: entire file
+    const now=new Date().toLocaleString();
+    const fname=S.fileMeta?.name||'Unknown File';
+
+    // Build human-readable period label for the header
+    let periodLabel='All Dates';
+    if(sp) periodLabel=`Date: ${sp}`;
+    else if(fr&&to) periodLabel=`${fr}  →  ${to}`;
+    else if(fr) periodLabel=`From ${fr}`;
+    else if(to) periodLabel=`Up to ${to}`;
+
+    // ── COLOUR PALETTE ──────────────────────────────────────
+    const C={
+      fnOrange:[249,115,22],
+      ieBlue:[59,130,246],
+      dark:[15,23,42],
+      mid:[71,85,105],
+      light:[148,163,184],
+      border:[226,232,240],
+      bg:[248,250,252],
+      white:[255,255,255],
+      ok:[34,197,94],
+      err:[239,68,68],
+      warn:[245,158,11],
+      cor:[139,92,246],
+    };
+    const rgb=(arr)=>({r:arr[0],g:arr[1],b:arr[2]});
+
+    let Y=0; // current Y cursor
+
+    // ══════════════════════════════════════════════════════
+    //  PAGE 1: EXECUTIVE SUMMARY
+    // ══════════════════════════════════════════════════════
+
+    // ── HEADER BAR ──────────────────────────────────────
+    // Gradient simulation: two rects blended
+    doc.setFillColor(...C.dark);
+    doc.rect(0,0,PW,28,'F');
+
+    // Orange accent strip (left)
+    doc.setFillColor(...C.fnOrange);
+    doc.rect(0,0,6,28,'F');
+
+    // Logo text
+    doc.setTextColor(...C.white);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(16);
+    doc.text('Data Validation & Audit Summary',M+2,11);
+
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.light);
+    doc.text('Field Nation  ×  Internal Entity — Management Report',M+2,17.5);
+    doc.text(`Generated: ${now}  |  Period: ${periodLabel}  |  Source: ${fname}`,M+2,22.5);
+
+    // IE / FN badges (top right)
+    const bx=PW-M-52;
+    doc.setFillColor(...C.ieBlue);
+    doc.roundedRect(bx,6,24,8,2,2,'F');
+    doc.setTextColor(...C.white);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(7);
+    doc.text('IE = BLUE',bx+3.5,11.2);
+
+    doc.setFillColor(...C.fnOrange);
+    doc.roundedRect(bx+26,6,26,8,2,2,'F');
+    doc.text('FN = ORANGE',bx+29,11.2);
+
+    Y=34;
+
+    // ── SECTION TITLE ─────────────────────────────────
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...C.mid);
+    doc.text('EXECUTIVE DASHBOARD — KEY PERFORMANCE INDICATORS',M,Y);
+    doc.setDrawColor(...C.border);
+    doc.setLineWidth(0.3);
+    doc.line(M,Y+1.5,PW-M,Y+1.5);
+    Y+=7;
+
+    // ── KPI CARDS ─────────────────────────────────────
+    // 6 cards in 2 rows × 3 cols
+    const KW=(CW-8)/3, KH=20;
+    const periodSub = hasDateFilter ? `period: ${periodLabel}` : 'all dates';
+    const kpis=[
+      { label:'Total Tickets Audited', value:sv.n,       sub:periodSub,             color:C.dark },
+      { label:'Accuracy Rate',         value:`${sv.cp}%`, sub:'matched + corrected', color:C.ieBlue },
+      { label:'Manual Corrections',    value:sv.c,        sub:'marked as corrected', color:C.cor },
+      { label:'Open Errors',           value:sv.e,        sub:'pending resolution',  color:C.err },
+      { label:'ITD/ITR Exceptions',    value:sv.x,        sub:'auto-approved',       color:C.warn },
+      { label:'Matched (Clean)',        value:sv.m,        sub:'no issues found',     color:C.ok },
+    ];
+
+    kpis.forEach((k,i)=>{
+      const col=i%3, row=Math.floor(i/3);
+      const kx=M+col*(KW+4), ky=Y+row*(KH+4);
+      // card bg
+      doc.setFillColor(...C.white);
+      doc.setDrawColor(...C.border);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(kx,ky,KW,KH,2,2,'FD');
+      // left accent bar
+      doc.setFillColor(...k.color);
+      doc.roundedRect(kx,ky,3,KH,1,1,'F');
+      // value
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(16);
+      doc.setTextColor(...k.color);
+      doc.text(String(k.value),kx+6,ky+11);
+      // label
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(7);
+      doc.setTextColor(...C.dark);
+      doc.text(k.label.toUpperCase(),kx+6,ky+15.5);
+      // sub
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(...C.light);
+      doc.text(k.sub,kx+6,ky+18.5);
+    });
+
+    Y+=2*(KH+4)+6;
+
+    // ── COMPARISON ROW: Period vs Full File ────────────
+    doc.setFillColor(...C.bg);
+    doc.setDrawColor(...C.border);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(M,Y,CW,11,2,2,'FD');
+
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.dark);
+    doc.text('Full File (all dates):',M+3,Y+7);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...C.mid);
+    doc.text(
+      `Total ${sa.n}  |  Matched ${sa.m}  |  Corrected ${sa.c}  |  Errors ${sa.e}  |  Accuracy ${sa.cp}%`,
+      M+38, Y+7
+    );
+    Y+=17;
+
+    // ── VISUAL ANALYTICS SECTION ───────────────────────
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...C.mid);
+    doc.text('VISUAL ANALYTICS',M,Y);
+    doc.line(M,Y+1.5,PW-M,Y+1.5);
+    Y+=7;
+
+    // Capture charts from canvas
+    const [pieImg,barImg,typImg]=await Promise.all([
+      captureChart('cPie'),
+      captureChart('cBar'),
+      captureChart('cType'),
+    ]);
+
+    const chartH=52;
+    const chartW=(CW-8)/3;
+
+    const chartLabels=['Validation Results','Error Breakdown','Ticket Types'];
+    const chartImgs=[pieImg,barImg,typImg];
+
+    chartLabels.forEach((lbl,i)=>{
+      const cx=M+i*(chartW+4);
+      // chart frame
+      doc.setFillColor(...C.bg);
+      doc.setDrawColor(...C.border);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(cx,Y,chartW,chartH+8,2,2,'FD');
+      // chart title
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(7);
+      doc.setTextColor(...C.mid);
+      doc.text(lbl.toUpperCase(),cx+3,Y+5);
+      // embed image
+      if(chartImgs[i]){
+        try{ doc.addImage(chartImgs[i],'PNG',cx+2,Y+7,chartW-4,chartH-2); }catch(_){}
+      } else {
+        // Fallback: simple text
+        doc.setFont('helvetica','normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...C.light);
+        doc.text('Chart unavailable',cx+chartW/2-12,Y+chartH/2+4);
+      }
+    });
+
+    Y+=chartH+14;
+
+    // ── PERIOD CONTEXT BOX ────────────────────────────
+    doc.setFillColor(239,246,255); // light blue bg
+    doc.setDrawColor(...C.ieBlue);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(M,Y,CW,18,2,2,'FD');
+
+    // Left accent
+    doc.setFillColor(...C.ieBlue);
+    doc.roundedRect(M,Y,3,18,1,1,'F');
+
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.ieBlue);
+    doc.text('REPORTING PERIOD',M+6,Y+6.5);
+
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...C.dark);
+    doc.text(periodLabel,M+6,Y+13);
+
+    // Right side: note
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...C.mid);
+    doc.text('KPI cards above reflect ALL tickets within this period, regardless of status filter.',PW-M-98,Y+7);
+    doc.text(`UI status filter "${E.statF.value||'all'}" and type filter "${E.typeF.value||'all'}" affect the anomaly table (page 2) only.`,PW-M-98,Y+13);
+
+    Y+=24;
+
+    // ══════════════════════════════════════════════════════
+    //  PAGE 2: AUDIT DETAILS TABLE
+    // ══════════════════════════════════════════════════════
+    doc.addPage();
+    Y=0;
+
+    // Header bar on page 2
+    doc.setFillColor(...C.dark);
+    doc.rect(0,0,PW,20,'F');
+    doc.setFillColor(...C.fnOrange);
+    doc.rect(0,0,6,20,'F');
+    doc.setTextColor(...C.white);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(13);
+    doc.text('Audit Details — Anomalies & Resolution Status',M+2,13);
+    Y=26;
+
+    // Section subtitle
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.mid);
+    // Use datePeriodRows for the table — all anomalies in the selected period
+    const anomalyRows=datePeriodRows.filter(r=>r.fRes!=='Matched'||(r.excA&&r.fRes==='Matched'));
+    doc.text(`Period: ${periodLabel}  |  ${anomalyRows.length} anomalies (errors, corrections, exceptions) out of ${datePeriodRows.length} tickets.`,M,Y);
+    Y+=8;
+
+    // Table header
+    const cols=[
+      {label:'Ticket',    w:28},
+      {label:'Type',      w:14},
+      {label:'IE Due Date',w:26},
+      {label:'FN Date',   w:26},
+      {label:'IE Name',   w:32},
+      {label:'FN Name',   w:32},
+      {label:'Result',    w:22},
+      {label:'Details',   w:CW-28-14-26-26-32-32-22},
+    ];
+    const tableX=M;
+    const rowH=7.5;
+    const headerH=9;
+
+    // Header bg
+    doc.setFillColor(...C.dark);
+    doc.rect(tableX,Y,CW,headerH,'F');
+    doc.setTextColor(...C.white);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(7);
+    let cx2=tableX+2;
+    cols.forEach(col=>{
+      doc.text(col.label,cx2,Y+6);
+      cx2+=col.w;
+    });
+    Y+=headerH;
+
+    // Table rows
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(6.5);
+
+    if(!anomalyRows.length){
+      doc.setFillColor(...C.bg);
+      doc.rect(tableX,Y,CW,10,'F');
+      doc.setTextColor(...C.mid);
+      doc.text('No anomalies found in current filter view — all tickets matched.',tableX+4,Y+6.5);
+      Y+=10;
+    }
+
+    anomalyRows.forEach((r,idx)=>{
+      // Page break check
+      if(Y>PH-20){
+        doc.addPage();
+        Y=15;
+        // mini header
+        doc.setFillColor(...C.dark);
+        doc.rect(0,0,PW,12,'F');
+        doc.setFillColor(...C.fnOrange);
+        doc.rect(0,0,6,12,'F');
+        doc.setTextColor(...C.white);
+        doc.setFont('helvetica','bold');
+        doc.setFontSize(9);
+        doc.text('Audit Details (continued)',M+2,8.5);
+        Y=18;
+        // re-draw table header
+        doc.setFillColor(...C.dark);
+        doc.rect(tableX,Y,CW,headerH,'F');
+        doc.setTextColor(...C.white);
+        doc.setFont('helvetica','bold');
+        doc.setFontSize(7);
+        let hx=tableX+2;
+        cols.forEach(c=>{doc.text(c.label,hx,Y+6);hx+=c.w;});
+        Y+=headerH;
+        doc.setFont('helvetica','normal');
+        doc.setFontSize(6.5);
+      }
+
+      // Row background
+      const isEven=idx%2===0;
+      if(r.fRes==='Error'){
+        doc.setFillColor(254,226,226); // red tint
+      } else if(r.fRes==='Corrected'){
+        doc.setFillColor(237,233,254); // purple tint
+      } else if(r.excA){
+        doc.setFillColor(254,243,199); // yellow tint
+      } else {
+        doc.setFillColor(isEven?248:255,isEven?250:255,isEven?252:255);
+      }
+      doc.rect(tableX,Y,CW,rowH,'F');
+
+      // Row border
+      doc.setDrawColor(...C.border);
+      doc.setLineWidth(0.1);
+      doc.line(tableX,Y+rowH,tableX+CW,Y+rowH);
+
+      // Result pill colour
+      const pillCol=r.fRes==='Error'?C.err:r.fRes==='Corrected'?C.cor:r.excA?C.warn:C.ok;
+
+      doc.setTextColor(...C.dark);
+      let rx=tableX+2;
+      const cellVals=[
+        r.ticket,r.type,r.ieDueDate,r.fnSD,
+        r.ieFEN.substring(0,18)||(r.ieFEN||''),
+        r.fnFEN.substring(0,18)||(r.fnFEN||''),
+      ];
+      cellVals.forEach((v,i)=>{
+        doc.setTextColor(...C.dark);
+        doc.text(String(v||'').substring(0,cols[i].w/1.6),rx,Y+5);
+        rx+=cols[i].w;
+      });
+
+      // Result pill
+      doc.setFillColor(...pillCol);
+      doc.roundedRect(rx,Y+1.5,18,5,1,1,'F');
+      doc.setTextColor(...C.white);
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(5.5);
+      doc.text(r.fRes.toUpperCase(),rx+1.5,Y+5);
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(6.5);
+      rx+=cols[6].w;
+
+      // Details (truncated)
+      doc.setTextColor(...C.mid);
+      const detStr=String(r.det||'').substring(0,52);
+      doc.text(detStr,rx,Y+5);
+
+      Y+=rowH;
+    });
+
+    Y+=6;
+
+    // ── SUMMARY TOTALS AT BOTTOM OF TABLE ─────────────
+    if(Y<PH-35){
+      doc.setFillColor(...C.dark);
+      doc.setDrawColor(...C.border);
+      doc.setLineWidth(0.2);
+      doc.roundedRect(M,Y,CW,14,2,2,'FD');
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...C.white);
+      doc.text(`Period Summary  (${periodLabel}):`,M+4,Y+9);
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(200,220,255);
+      doc.text(
+        `Errors: ${sv.e}   Corrected: ${sv.c}   Exceptions: ${sv.x}   Matched: ${sv.m}   Total: ${sv.n}   Accuracy: ${sv.cp}%`,
+        M+52,Y+9
+      );
+    }
+
+    // ── FOOTER on all pages ──────────────────────────
+    const pgCount=doc.internal.getNumberOfPages();
+    for(let pg=1;pg<=pgCount;pg++){
+      doc.setPage(pg);
+      doc.setFillColor(...C.bg);
+      doc.rect(0,PH-10,PW,10,'F');
+      doc.setDrawColor(...C.border);
+      doc.setLineWidth(0.2);
+      doc.line(0,PH-10,PW,PH-10);
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(...C.light);
+      doc.text(`Validation Report 0001  |  Field Nation × Internal Entity Audit  |  ${now}`,M,PH-4.5);
+      doc.text(`Page ${pg} of ${pgCount}`,PW-M-16,PH-4.5);
+    }
+
+    // ── SAVE ─────────────────────────────────────────
+    doc.save(`management_audit_report_${stamp()}.pdf`);
+
+  } catch(err){
+    console.error('[VRA PDF]',err);
+    showBan(`PDF generation failed: ${err.message}`);
+    showDbg('PDF export error',err.stack||String(err));
+  } finally {
+    $('pdfOverlay').classList.add('h');
+  }
 }
 
 /* ═══ SELF-TEST ════════════════════════════════════════════════ */
@@ -716,6 +1145,8 @@ function selfTest(){
   const iss=[];
   if(typeof XLSX==='undefined') iss.push('SheetJS not loaded — Excel files cannot be processed');
   if(typeof Chart==='undefined') iss.push('Chart.js not loaded — charts will not render');
+  if(typeof window.jspdf==='undefined'&&typeof jsPDF==='undefined') iss.push('jsPDF not loaded — PDF export will not work');
+  if(typeof html2canvas==='undefined') iss.push('html2canvas not loaded — chart images in PDF unavailable');
   if(!window.FileReader) iss.push('FileReader API missing — cannot read local files');
   if(iss.length){
     showBan(`⚠ ${iss.join(' | ')}. Try disabling ad-blockers or use Chrome/Edge.`,'warn');
@@ -734,12 +1165,10 @@ function bindAll(){
   dz.addEventListener('drop',ev=>{ev.preventDefault();dz.classList.remove('dr');const f=ev.dataTransfer.files?.[0];if(f)handleWB(f);});
   $('applyBtn').addEventListener('click',applyFilters);
   $('clearBtn').addEventListener('click',clearF);
-  $('xlsxBtn').addEventListener('click',exportXlsx);
-  $('emlBtn').addEventListener('click',exportEml);
+  $('pdfBtn').addEventListener('click',exportPDF);
   ['srch','typeF','statF','specD','fromD','toD'].forEach(id=>{
     $(id).addEventListener('input',applyFilters);$(id).addEventListener('change',applyFilters);
   });
-  ['eTo','eCc','eSubj'].forEach(id=>$(id).addEventListener('change',saveState));
   E.tbody.addEventListener('click',ev=>{const b=ev.target.closest('[data-cid]');if(b)markCorrected(b.getAttribute('data-cid'));});
   window.addEventListener('error',ev=>{console.error('[VRA]',ev.error||ev.message);showBan(`Error: ${ev.message||'Unknown'}`);});
   window.addEventListener('unhandledrejection',ev=>{console.error('[VRA]',ev.reason);showBan(`Async error: ${ev.reason?.message||ev.reason||'Unknown'}`);});
